@@ -1,0 +1,332 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Role helpers fetched from users collection
+    function hasUserDoc() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'maynulhasan625@gmail.com'
+      );
+    }
+
+    function isUniversityAdmin() {
+      return isSignedIn() && (
+        isBootstrappedAdmin() ||
+        (hasUserDoc() && (
+          getUserData().role == 'admin' ||
+          getUserData().role == 'university_admin'
+        ))
+      );
+    }
+
+    function isDeptAdmin(dept) {
+      return isSignedIn() && (
+        isUniversityAdmin() ||
+        (hasUserDoc() && (
+          getUserData().role == 'dept_admin' &&
+          (getUserData().assignedDepartment == dept || getUserData().departmentId == dept)
+        ))
+      );
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        isUniversityAdmin() ||
+        (hasUserDoc() && getUserData().role == 'dept_admin')
+      );
+    }
+
+    function isTeacher() {
+      return isSignedIn() && (
+        isAdmin() ||
+        (hasUserDoc() && (
+          getUserData().role == 'teacher' ||
+          getUserData().role == 'advisor'
+        ))
+      );
+    }
+
+    // Check if user is an assigned teacher for a specific course offering
+    function isCourseTeacherOf(offeringId) {
+      return isSignedIn() && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/courseOfferings/$(offeringId)) &&
+         request.auth.uid in get(/databases/$(database)/documents/courseOfferings/$(offeringId)).data.teacherIds)
+      );
+    }
+
+    // Check if a teacher is assigned as advisor to student
+    function isAdvisorOf(studentUid) {
+      return isTeacher() && exists(/databases/$(database)/documents/advisorAssignments/$(request.auth.uid + '_' + studentUid));
+    }
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 1. users
+    // Registration allowed only if role == 'student'. Role cannot be changed by the user.
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (
+        (isOwner(userId) && incoming().role == 'student') ||
+        isAdmin()
+      );
+      allow update: if isSignedIn() && (
+        (isOwner(userId) && incoming().role == existing().role) ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 2. studentProfiles
+    match /studentProfiles/{profileId} {
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isTeacher() ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && (
+        isAdmin() ||
+        isTeacher() ||
+        incoming().userId == request.auth.uid
+      );
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        isTeacher() ||
+        (resource.data.userId == request.auth.uid && incoming().userId == existing().userId && incoming().studentId == existing().studentId && incoming().department == existing().department)
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 3. advisorAssignments
+    match /advisorAssignments/{assignmentId} {
+      allow read: if isSignedIn() && (
+        resource.data.studentId == request.auth.uid ||
+        resource.data.teacherId == request.auth.uid ||
+        isAdmin()
+      );
+      allow write: if isAdmin();
+    }
+
+    // 4. semesters
+    match /semesters/{semesterId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // 5. courses
+    match /courses/{courseId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    // departments
+    match /departments/{departmentId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // courseOfferings
+    match /courseOfferings/{offeringId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    // studentInvitations
+    match /studentInvitations/{invitationId} {
+      allow read: if true; // Public read to allow token verification
+      allow create: if isAdmin();
+      allow update: if isAdmin() || (
+        isSignedIn() &&
+        incoming().status == 'claimed' &&
+        incoming().claimedByUid == request.auth.uid
+      );
+      allow delete: if isAdmin();
+    }
+
+    // attendanceSessions
+    match /attendanceSessions/{sessionId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacher() || isAdmin();
+    }
+
+    // auditCorrections
+    match /auditCorrections/{correctionId} {
+      allow read: if isSignedIn() && (isTeacher() || isAdmin());
+      allow create: if isTeacher() || isAdmin();
+      allow update, delete: if false; // strictly append-only
+    }
+
+    // 6. enrollments
+    match /enrollments/{enrollmentId} {
+      allow read: if isSignedIn() && (
+        resource.data.studentId == request.auth.uid ||
+        isTeacher() ||
+        isAdmin()
+      );
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    // 7. attendanceRecords
+    match /attendanceRecords/{recordId} {
+      allow read: if isSignedIn() && (
+        resource.data.studentId == request.auth.uid ||
+        isTeacher() ||
+        isAdmin()
+      );
+      allow write: if isTeacher() || isAdmin();
+    }
+
+    // 8. assessments
+    match /assessments/{assessmentId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacher() || isAdmin();
+    }
+
+    // 9. marks
+    match /marks/{markId} {
+      allow read: if isSignedIn() && (
+        resource.data.studentId == request.auth.uid ||
+        isTeacher() ||
+        isAdmin()
+      );
+      allow write: if isTeacher() || isAdmin();
+    }
+
+    // 10. deadlines
+    match /deadlines/{deadlineId} {
+      allow read: if isSignedIn();
+      allow write: if isTeacher() || isAdmin();
+    }
+
+    // 11. riskConfig
+    match /riskConfig/{configId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // 12. riskAssessments (Append-only by server/transaction)
+    match /riskAssessments/{assessmentId} {
+      allow read: if isSignedIn() && (
+        resource.data.studentId == request.auth.uid ||
+        isTeacher() ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && (
+        isAdmin() ||
+        isTeacher() ||
+        incoming().studentId == request.auth.uid
+      );
+      allow update, delete: if false; // strictly append-only
+    }
+
+    // 13. alertDeliveries (Trusted delivery ledger)
+    match /alertDeliveries/{deliveryId} {
+      allow read: if isSignedIn() && (
+        resource.data.studentId == request.auth.uid ||
+        isTeacher() ||
+        isAdmin()
+      );
+      // Only teachers, administrators, or backend services can issue alerts
+      allow create: if isTeacher() || isAdmin();
+      // Student can only acknowledge their existing delivered alert
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (resource.data.studentId == request.auth.uid && incoming().status == 'acknowledged')
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 14. alertCounters (Authoritative monthly quota state)
+    match /alertCounters/{counterId} {
+      allow read: if isSignedIn() && (
+        isAdmin() ||
+        isTeacher() ||
+        resource.data.studentId == request.auth.uid
+      );
+      // Strictly protected: Ordinary clients CANNOT write, modify, or decrement counters
+      allow write: if isAdmin();
+    }
+
+    // 15. notifications (System and faculty dispatches)
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      // Users can mark their notifications as read
+      allow update: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      // Notifications can only be created by teachers, admins, or backend
+      allow create: if isTeacher() || isAdmin();
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    // 16. feedback (Append-only)
+    match /feedback/{feedbackId} {
+      allow read: if isSignedIn() && (
+        isAdmin() ||
+        resource.data.teacherId == request.auth.uid ||
+        (!resource.data.isPrivateToFaculty && resource.data.studentId == request.auth.uid)
+      );
+      allow create: if isTeacher() || isAdmin();
+      allow update, delete: if false; // strictly append-only
+    }
+
+    // 17. interventions
+    match /interventions/{interventionId} {
+      allow read: if isSignedIn() && (
+        resource.data.studentId == request.auth.uid ||
+        resource.data.teacherId == request.auth.uid ||
+        isAdmin()
+      );
+      allow write: if isTeacher() || isAdmin();
+    }
+
+    // 18. followUps (Append-only)
+    match /followUps/{followUpId} {
+      allow read: if isSignedIn() && (
+        isAdmin() ||
+        resource.data.teacherId == request.auth.uid ||
+        exists(/databases/$(database)/documents/interventions/$(resource.data.interventionId)) &&
+        get(/databases/$(database)/documents/interventions/$(resource.data.interventionId)).data.studentId == request.auth.uid
+      );
+      allow create: if isTeacher() || isAdmin();
+      allow update, delete: if false; // strictly append-only
+    }
+
+    // Connection test doc
+    match /test/{docId} {
+      allow read: if true;
+    }
+  }
+}

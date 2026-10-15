@@ -1,0 +1,514 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role-based access information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Auth UID" },
+        "email": { "type": "string", "description": "User email address" },
+        "displayName": { "type": "string", "description": "Full name" },
+        "role": { "type": "string", "enum": ["student", "teacher", "admin"] },
+        "avatarUrl": { "type": "string", "description": "Optional avatar URL" },
+        "createdAt": { "type": "string", "description": "ISO timestamp" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp" }
+      },
+      "required": ["id", "email", "displayName", "role", "createdAt", "updatedAt"]
+    },
+    "StudentProfile": {
+      "title": "StudentProfile",
+      "description": "Extended student profile metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string", "description": "University Student ID e.g. CSE-2022-041" },
+        "userId": { "type": "string", "description": "Auth UID" },
+        "department": { "type": "string" },
+        "batch": { "type": "string" },
+        "currentSemesterId": { "type": "string" },
+        "cgpa": { "type": "number" },
+        "phone": { "type": "string" },
+        "emergencyContact": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "studentId", "userId", "department", "batch", "currentSemesterId", "createdAt", "updatedAt", "createdBy"]
+    },
+    "AdvisorAssignment": {
+      "title": "AdvisorAssignment",
+      "description": "Relationship linking faculty advisor to advisee student",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "assignedDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "teacherId", "studentId", "assignedDate", "status", "createdAt", "updatedAt", "createdBy"]
+    },
+    "Semester": {
+      "title": "Semester",
+      "description": "Academic term representation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "isCurrent": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "name", "startDate", "endDate", "isCurrent", "createdAt", "updatedAt", "createdBy"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "Academic course offering",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "title": { "type": "string" },
+        "credits": { "type": "number" },
+        "department": { "type": "string" },
+        "isActive": { "type": "boolean", "description": "Whether course is actively offered" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "code", "title", "credits", "department", "createdAt", "updatedAt", "createdBy"]
+    },
+    "Enrollment": {
+      "title": "Enrollment",
+      "description": "Student enrollment in a course for a semester",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "semesterId": { "type": "string" },
+        "status": { "type": "string", "enum": ["enrolled", "dropped", "completed"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "studentId", "courseId", "semesterId", "status", "createdAt", "updatedAt", "createdBy"]
+    },
+    "AttendanceRecord": {
+      "title": "AttendanceRecord",
+      "description": "Daily attendance for a student enrollment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "enrollmentId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["present", "absent", "late", "excused"] },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "enrollmentId", "studentId", "courseId", "date", "status", "createdAt", "updatedAt", "createdBy"]
+    },
+    "Assessment": {
+      "title": "Assessment",
+      "description": "Assessment definition within a course",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "courseId": { "type": "string" },
+        "semesterId": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["quiz", "assignment", "midterm", "final", "project"] },
+        "maxMarks": { "type": "number" },
+        "weightage": { "type": "number" },
+        "dueDate": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "courseId", "semesterId", "title", "type", "maxMarks", "weightage", "dueDate", "createdAt", "updatedAt", "createdBy"]
+    },
+    "Mark": {
+      "title": "Mark",
+      "description": "Grading record for an assessment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "assessmentId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "enrollmentId": { "type": "string" },
+        "obtainedMarks": { "type": "number" },
+        "submittedAt": { "type": "string" },
+        "gradedAt": { "type": "string" },
+        "gradedBy": { "type": "string" },
+        "feedback": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "assessmentId", "studentId", "enrollmentId", "createdAt", "updatedAt", "createdBy"]
+    },
+    "Deadline": {
+      "title": "Deadline",
+      "description": "Academic deadline entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "courseId": { "type": "string" },
+        "semesterId": { "type": "string" },
+        "assessmentId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "type": { "type": "string", "enum": ["assignment", "project", "quiz"] },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "courseId", "title", "dueDate", "type", "createdAt", "updatedAt", "createdBy"]
+    },
+    "RiskConfig": {
+      "title": "RiskConfig",
+      "description": "Rule-based thresholds configuration for the risk engine",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "version": { "type": "string" },
+        "attendanceThresholdMedium": { "type": "number" },
+        "attendanceThresholdHigh": { "type": "number" },
+        "marksThresholdMedium": { "type": "number" },
+        "marksThresholdHigh": { "type": "number" },
+        "missingSubmissionsLimit": { "type": "number" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "version", "attendanceThresholdMedium", "attendanceThresholdHigh", "marksThresholdMedium", "marksThresholdHigh", "missingSubmissionsLimit", "active", "createdAt", "updatedAt", "createdBy"]
+    },
+    "RiskAssessment": {
+      "title": "RiskAssessment",
+      "description": "Append-only risk evaluation record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "semesterId": { "type": "string" },
+        "riskLevel": { "type": "string", "enum": ["Low", "Medium", "High"] },
+        "attendancePercentage": { "type": "number" },
+        "marksAverage": { "type": "number" },
+        "missingAssignmentsCount": { "type": "number" },
+        "reasons": { "type": "array" },
+        "trigger": { "type": "string", "enum": ["academic_update", "scheduled_job", "manual_review"] },
+        "configVersion": { "type": "string" },
+        "computedAt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "studentId", "semesterId", "riskLevel", "attendancePercentage", "marksAverage", "missingAssignmentsCount", "reasons", "trigger", "configVersion", "computedAt", "createdAt", "updatedAt", "createdBy"]
+    },
+    "AlertDelivery": {
+      "title": "AlertDelivery",
+      "description": "Delivery log for risk alerts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "riskAssessmentId": { "type": "string" },
+        "riskLevel": { "type": "string", "enum": ["Medium", "High"] },
+        "channel": { "type": "string", "enum": ["in_app", "email"] },
+        "status": { "type": "string", "enum": ["pending", "delivered", "failed", "acknowledged"] },
+        "acknowledgedAt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "studentId", "riskAssessmentId", "riskLevel", "channel", "status", "createdAt", "updatedAt", "createdBy"]
+    },
+    "AlertCounter": {
+      "title": "AlertCounter",
+      "description": "Monthly rate limiting counter for student alert deliveries",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "period": { "type": "string" },
+        "inAppCount": { "type": "number" },
+        "emailCount": { "type": "number" },
+        "lastDispatchedAt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "studentId", "period", "inAppCount", "emailCount", "lastDispatchedAt", "createdAt", "updatedAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User in-app notification message",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "category": { "type": "string", "enum": ["risk_alert", "assignment", "attendance", "intervention", "general"] },
+        "isRead": { "type": "boolean" },
+        "readAt": { "type": "string" },
+        "link": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "message", "category", "isRead", "createdAt", "updatedAt", "createdBy"]
+    },
+    "Feedback": {
+      "title": "Feedback",
+      "description": "Append-only advisor feedback notes on student progress",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "category": { "type": "string", "enum": ["academic", "attendance", "behavioral", "general"] },
+        "comment": { "type": "string" },
+        "isPrivateToFaculty": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "studentId", "teacherId", "category", "comment", "isPrivateToFaculty", "createdAt", "updatedAt", "createdBy"]
+    },
+    "Intervention": {
+      "title": "Intervention",
+      "description": "Targeted academic intervention plan",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "reason": { "type": "string" },
+        "actionPlan": { "type": "string" },
+        "targetDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "in_progress", "resolved", "escalated"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "studentId", "teacherId", "reason", "actionPlan", "targetDate", "status", "createdAt", "updatedAt", "createdBy"]
+    },
+    "FollowUp": {
+      "title": "FollowUp",
+      "description": "Append-only meeting or progress update on an active intervention",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "interventionId": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "progressNotes": { "type": "string" },
+        "statusUpdate": { "type": "string", "enum": ["in_progress", "resolved", "escalated"] },
+        "meetingDate": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "interventionId", "teacherId", "progressNotes", "statusUpdate", "meetingDate", "createdAt", "updatedAt", "createdBy"]
+    },
+    "Department": {
+      "title": "Department",
+      "description": "Academic department entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "headOfDeptId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "code", "name", "createdAt", "updatedAt"]
+    },
+    "CourseOffering": {
+      "title": "CourseOffering",
+      "description": "Term and section specific course offering with assigned teachers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "courseId": { "type": "string" },
+        "courseCode": { "type": "string" },
+        "courseTitle": { "type": "string" },
+        "semesterId": { "type": "string" },
+        "section": { "type": "string" },
+        "teacherIds": { "type": "array", "items": { "type": "string" } },
+        "advisorIds": { "type": "array", "items": { "type": "string" } },
+        "capacity": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "archived"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "courseId", "semesterId", "section", "teacherIds", "status", "createdAt", "updatedAt"]
+    },
+    "StudentInvitation": {
+      "title": "StudentInvitation",
+      "description": "Official admin-issued student invitation token for secure activation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "token": { "type": "string" },
+        "officialStudentId": { "type": "string" },
+        "email": { "type": "string" },
+        "department": { "type": "string" },
+        "batch": { "type": "string" },
+        "section": { "type": "string" },
+        "level": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "claimed", "expired", "revoked"] },
+        "expiresAt": { "type": "string" },
+        "claimedAt": { "type": "string" },
+        "claimedByUid": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["id", "token", "officialStudentId", "email", "department", "batch", "status", "expiresAt", "createdAt", "createdBy"]
+    },
+    "AttendanceSession": {
+      "title": "AttendanceSession",
+      "description": "Attendance session tracking draft, published, and correction history",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "courseOfferingId": { "type": "string" },
+        "courseId": { "type": "string" },
+        "semesterId": { "type": "string" },
+        "section": { "type": "string" },
+        "date": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "published", "cancelled"] },
+        "publishedAt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "courseId", "semesterId", "date", "teacherId", "status", "createdAt", "updatedAt"]
+    },
+    "AuditCorrectionRecord": {
+      "title": "AuditCorrectionRecord",
+      "description": "Append-only audit record for marks and attendance corrections",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "entityType": { "type": "string", "enum": ["attendance", "mark", "assessment"] },
+        "recordId": { "type": "string" },
+        "field": { "type": "string" },
+        "reason": { "type": "string" },
+        "actorUid": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "entityType", "recordId", "field", "reason", "actorUid", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User account documents containing role and basic info"
+    },
+    "/studentProfiles/{profileId}": {
+      "schema": { "$ref": "#/entities/StudentProfile" },
+      "description": "Student extended academic profiles"
+    },
+    "/advisorAssignments/{assignmentId}": {
+      "schema": { "$ref": "#/entities/AdvisorAssignment" },
+      "description": "Faculty advisor assignments to students"
+    },
+    "/semesters/{semesterId}": {
+      "schema": { "$ref": "#/entities/Semester" },
+      "description": "Academic semester definitions"
+    },
+    "/courses/{courseId}": {
+      "schema": { "$ref": "#/entities/Course" },
+      "description": "Course catalog offerings"
+    },
+    "/departments/{departmentId}": {
+      "schema": { "$ref": "#/entities/Department" },
+      "description": "Academic department records"
+    },
+    "/courseOfferings/{offeringId}": {
+      "schema": { "$ref": "#/entities/CourseOffering" },
+      "description": "Term offerings for courses with assigned teachers and sections"
+    },
+    "/studentInvitations/{invitationId}": {
+      "schema": { "$ref": "#/entities/StudentInvitation" },
+      "description": "Admin pre-registered invitations for student activation"
+    },
+    "/attendanceSessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/AttendanceSession" },
+      "description": "Course attendance session records"
+    },
+    "/auditCorrections/{correctionId}": {
+      "schema": { "$ref": "#/entities/AuditCorrectionRecord" },
+      "description": "Audit trails for marks and attendance modifications"
+    },
+    "/enrollments/{enrollmentId}": {
+      "schema": { "$ref": "#/entities/Enrollment" },
+      "description": "Student course enrollments"
+    },
+    "/attendanceRecords/{attendanceId}": {
+      "schema": { "$ref": "#/entities/AttendanceRecord" },
+      "description": "Daily student attendance records"
+    },
+    "/assessments/{assessmentId}": {
+      "schema": { "$ref": "#/entities/Assessment" },
+      "description": "Assessments per course"
+    },
+    "/marks/{markId}": {
+      "schema": { "$ref": "#/entities/Mark" },
+      "description": "Student grading entries"
+    },
+    "/deadlines/{deadlineId}": {
+      "schema": { "$ref": "#/entities/Deadline" },
+      "description": "Course task deadlines"
+    },
+    "/riskConfig/{configId}": {
+      "schema": { "$ref": "#/entities/RiskConfig" },
+      "description": "Configurable risk engine parameters"
+    },
+    "/riskAssessments/{assessmentId}": {
+      "schema": { "$ref": "#/entities/RiskAssessment" },
+      "description": "Append-only risk evaluation history"
+    },
+    "/alertDeliveries/{deliveryId}": {
+      "schema": { "$ref": "#/entities/AlertDelivery" },
+      "description": "Risk alert dispatch logs"
+    },
+    "/alertCounters/{counterId}": {
+      "schema": { "$ref": "#/entities/AlertCounter" },
+      "description": "Monthly rate limiting counters for alerts"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "In-app notifications for users"
+    },
+    "/feedback/{feedbackId}": {
+      "schema": { "$ref": "#/entities/Feedback" },
+      "description": "Advisor feedback entries"
+    },
+    "/interventions/{interventionId}": {
+      "schema": { "$ref": "#/entities/Intervention" },
+      "description": "Academic intervention plans"
+    },
+    "/followUps/{followUpId}": {
+      "schema": { "$ref": "#/entities/FollowUp" },
+      "description": "Intervention progress follow-up logs"
+    }
+  }
+}

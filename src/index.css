@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@layer base {
+  html, body {
+    background-color: #F1F5F9;
+    color: #0F172A;
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Force light mode styling across form controls */
+  input, select, textarea, button {
+    font-family: inherit;
+  }
+}
+
+/* Subtle animation helpers */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.15s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.15s ease-out forwards;
+}

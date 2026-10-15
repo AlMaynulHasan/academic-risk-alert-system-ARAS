@@ -1,0 +1,6 @@
+{
+  "summary": "Finalized Business Rules and 5-Phase Implementation Plan for the Academic Risk Alert System, detailing role-based scoping (University Admin, Department Admin, Course Teacher, Advisor, Student), administrative pre-registration with tokenized student activation, academic hierarchy (University -> Departments -> Semesters -> Courses -> Course Offerings -> Enrollments), attendance/marks semantics, preserved deterministic risk formula v1.0.0, trusted monthly alert quota (max 2/month in Asia/Dhaka), intervention lifecycle, and non-breaking migration strategy.",
+  "updatedAt": "2026-10-15T15:21:18.042423543Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

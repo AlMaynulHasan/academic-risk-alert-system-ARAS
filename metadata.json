@@ -1,0 +1,8 @@
+{
+  "name": "Academic Risk Alert System",
+  "description": "Identify students at academic risk from attendance, marks, assignments, and exam results with role-based dashboards for students, teachers, and administrators.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
