@@ -71,7 +71,7 @@ export const StudentCoursesPage: React.FC = () => {
       />
 
       {/* Term Metadata Strip */}
-      <div className="bg-white border border-slate-200 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+      <div className="bg-white border border-slate-200/90 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-[0_1px_3px_0_rgba(15,23,42,0.06),0_1px_2px_-1px_rgba(15,23,42,0.06)]">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5 text-slate-700">
             <Calendar size={15} className="text-blue-600" />

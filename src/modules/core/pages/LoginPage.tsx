@@ -8,7 +8,7 @@ import { FormField } from '../../../shared/ui/FormField';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle, loginDemoUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -66,7 +66,7 @@ export const LoginPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const role = await login(demoEmail, 'Pass1234!');
+      const role = await loginDemoUser(demoEmail);
       routeByRole(role);
     } catch (err: unknown) {
       console.error('Quick demo login error:', err);
@@ -77,23 +77,23 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-100/90 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="w-12 h-12 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-xs">
-            <School size={28} />
+          <div className="w-12 h-12 rounded-xl bg-[#0b1329] flex items-center justify-center text-blue-400 shadow-sm border border-slate-700/60 ring-2 ring-blue-500/20">
+            <School size={26} />
           </div>
         </div>
         <h2 className="mt-4 text-center text-2xl font-bold tracking-tight text-slate-900">
           Academic Risk Alert System
         </h2>
-        <p className="mt-1 text-center text-xs text-slate-500">
-          Sign in to your university advising portal
+        <p className="mt-1 text-center text-xs text-slate-500 font-medium">
+          Sign in to your university advising & monitoring portal
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div className="bg-white py-8 px-6 sm:px-8 border border-slate-200 rounded-lg shadow-xs">
+        <div className="bg-white py-8 px-6 sm:px-8 border border-slate-200/90 rounded-2xl shadow-[0_4px_6px_-1px_rgba(15,23,42,0.08),0_2px_4px_-2px_rgba(15,23,42,0.06)]">
           {successMessage && (
             <div className="mb-5 p-3 rounded-md bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-start gap-2">
               <span className="font-semibold">✓</span>
