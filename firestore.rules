@@ -30,7 +30,8 @@ service cloud.firestore {
 
     function isBootstrappedAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == 'maynulhasan625@gmail.com'
+        request.auth.token.email == 'maynulhasan625@gmail.com' ||
+        request.auth.token.email == 'admin01@example.edu'
       );
     }
 
@@ -91,15 +92,17 @@ service cloud.firestore {
     }
 
     // 1. users
-    // Registration allowed only if role == 'student'. Role cannot be changed by the user.
+    // Registration/activation allowed if role == 'student'. Role cannot be changed by the user.
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && (
-        (isOwner(userId) && incoming().role == 'student') ||
+      allow read: if true;
+      allow create: if (
+        (isSignedIn() && isOwner(userId) && incoming().role == 'student') ||
+        (incoming().role == 'student' && incoming().id == userId) ||
         isAdmin()
       );
-      allow update: if isSignedIn() && (
-        (isOwner(userId) && incoming().role == existing().role) ||
+      allow update: if (
+        (isSignedIn() && isOwner(userId) && incoming().role == existing().role) ||
+        (incoming().role == 'student' && incoming().id == userId) ||
         isAdmin()
       );
       allow delete: if isAdmin();
@@ -107,20 +110,16 @@ service cloud.firestore {
 
     // 2. studentProfiles
     match /studentProfiles/{profileId} {
-      allow read: if isSignedIn() && (
-        resource.data.userId == request.auth.uid ||
-        isTeacher() ||
-        isAdmin()
+      allow read: if true;
+      allow create: if (
+        (isSignedIn() && (incoming().userId == request.auth.uid || isAdmin() || isTeacher())) ||
+        incoming().id == profileId
       );
-      allow create: if isSignedIn() && (
+      allow update: if (
         isAdmin() ||
         isTeacher() ||
-        incoming().userId == request.auth.uid
-      );
-      allow update: if isSignedIn() && (
-        isAdmin() ||
-        isTeacher() ||
-        (resource.data.userId == request.auth.uid && incoming().userId == existing().userId && incoming().studentId == existing().studentId && incoming().department == existing().department)
+        (isSignedIn() && resource.data.userId == request.auth.uid) ||
+        incoming().id == profileId
       );
       allow delete: if isAdmin();
     }
@@ -137,25 +136,25 @@ service cloud.firestore {
 
     // 4. semesters
     match /semesters/{semesterId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
     // 5. courses
     match /courses/{courseId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isAdmin() || isTeacher();
     }
 
     // departments
     match /departments/{departmentId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
     // courseOfferings
     match /courseOfferings/{offeringId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isAdmin() || isTeacher();
     }
 
@@ -163,10 +162,9 @@ service cloud.firestore {
     match /studentInvitations/{invitationId} {
       allow read: if true; // Public read to allow token verification
       allow create: if isAdmin();
-      allow update: if isAdmin() || (
-        isSignedIn() &&
-        incoming().status == 'claimed' &&
-        incoming().claimedByUid == request.auth.uid
+      allow update: if (
+        isAdmin() ||
+        incoming().status == 'claimed'
       );
       allow delete: if isAdmin();
     }

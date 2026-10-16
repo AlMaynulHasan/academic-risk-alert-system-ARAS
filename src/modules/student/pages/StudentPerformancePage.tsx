@@ -18,7 +18,7 @@ import { StatCard } from '../../../shared/ui/StatCard';
 import { Select } from '../../../shared/ui/Select';
 import { Skeleton } from '../../../shared/ui/Skeleton';
 import { EmptyState } from '../../../shared/ui/EmptyState';
-import { MODULE_OWNERSHIP, PROVISIONAL_ATTENDANCE_THRESHOLD } from '../../../shared/constants';
+import { PROVISIONAL_ATTENDANCE_THRESHOLD } from '../../../shared/constants';
 import { TrendingUp, Calendar, AlertTriangle, Lightbulb, Clock, CheckCircle2 } from 'lucide-react';
 
 export const StudentPerformancePage: React.FC = () => {

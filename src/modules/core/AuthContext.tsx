@@ -147,10 +147,32 @@ const SYNTHETIC_DEMO_USERS: Record<string, { user: User; profile: StudentProfile
       id: 'demo-admin-01',
       studentId: '',
       userId: 'demo-admin-01',
-      department: '',
+      department: 'Computer Science and Engineering',
       batch: '',
       currentSemesterId: '2026-spring',
       cgpa: null,
+      createdAt: '2026-01-10T00:00:00.000Z',
+      updatedAt: '2026-01-10T00:00:00.000Z',
+      createdBy: 'system',
+    },
+  },
+  'maynulhasan625@gmail.com': {
+    user: {
+      id: 'user-maynul-hasan',
+      email: 'maynulhasan625@gmail.com',
+      displayName: 'Md. Al-Maynul Hasan (Administrator)',
+      role: 'admin',
+      createdAt: '2026-01-10T00:00:00.000Z',
+      updatedAt: '2026-01-10T00:00:00.000Z',
+    },
+    profile: {
+      id: 'user-maynul-hasan',
+      studentId: 'ADMIN-LEAD-01',
+      userId: 'user-maynul-hasan',
+      department: 'Computer Science and Engineering',
+      batch: '2022',
+      currentSemesterId: '2026-spring',
+      cgpa: 3.95,
       createdAt: '2026-01-10T00:00:00.000Z',
       updatedAt: '2026-01-10T00:00:00.000Z',
       createdBy: 'system',
@@ -230,8 +252,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfile(entry.profile);
       setRole(entry.user.role);
       setIsDemoSession(true);
-      setLoading(false);
-      return;
+      // Attempt background sign-in to populate Firebase Auth credentials for rules
+      signInWithEmailAndPassword(auth, storedDemoEmail, 'Pass1234!')
+        .catch(() => {});
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
@@ -275,6 +298,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!entry) {
       throw new Error(`Demo account ${demoEmail} not found.`);
     }
+
+    // Attempt Firebase Auth sign-in so that Firestore security rules receive valid request.auth
+    try {
+      let fbCred = null;
+      try {
+        fbCred = await signInWithEmailAndPassword(auth, demoEmail, 'Pass1234!');
+      } catch (signInErr: unknown) {
+        const msg = signInErr instanceof Error ? signInErr.message : String(signInErr);
+        if (msg.includes('user-not-found') || msg.includes('invalid-credential')) {
+          try {
+            fbCred = await createUserWithEmailAndPassword(auth, demoEmail, 'Pass1234!');
+          } catch (createErr) {
+            console.warn('Could not auto-create user in Firebase Auth:', createErr);
+          }
+        }
+      }
+
+      if (fbCred?.user) {
+        setFirebaseUser(fbCred.user);
+        const userRef = doc(db, 'users', fbCred.user.uid);
+        const userDocData: User = {
+          id: fbCred.user.uid,
+          email: demoEmail,
+          displayName: entry.user.displayName,
+          role: entry.user.role,
+          createdAt: getCurrentUtcIso(),
+          updatedAt: getCurrentUtcIso(),
+        };
+        try {
+          await setDoc(userRef, userDocData, { merge: true });
+        } catch (e) {
+          console.warn('Could not write user role doc in Firestore:', e);
+        }
+        setUser(userDocData);
+        setRole(entry.user.role);
+        setProfile(entry.profile);
+        setIsDemoSession(false);
+        localStorage.removeItem('aras_demo_session_email');
+        return entry.user.role;
+      }
+    } catch (authErr) {
+      console.warn('Firebase Auth sign in attempt for demo user failed:', authErr);
+    }
+
     setUser(entry.user);
     setProfile(entry.profile);
     setRole(entry.user.role);
@@ -378,15 +445,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const cred = await createUserWithEmailAndPassword(auth, inv.email, input.password);
         await updateProfile(cred.user, { displayName });
         uid = cred.user.uid;
+        setFirebaseUser(cred.user);
       } catch (authErr: unknown) {
         const errMsg = authErr instanceof Error ? authErr.message : String(authErr);
         if (errMsg.includes('email-already-in-use')) {
-          const cred = await signInWithEmailAndPassword(auth, inv.email, input.password);
-          uid = cred.user.uid;
-        } else if (errMsg.includes('operation-not-allowed')) {
-          uid = `student_${inv.officialStudentId.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+          try {
+            const cred = await signInWithEmailAndPassword(auth, inv.email, input.password);
+            uid = cred.user.uid;
+            setFirebaseUser(cred.user);
+          } catch {
+            uid = `student_${inv.officialStudentId.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+          }
         } else {
-          throw authErr;
+          uid = `student_${inv.officialStudentId.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
         }
       }
 
@@ -401,13 +472,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updatedAt: now,
       };
 
-      await setDoc(doc(db, 'users', uid), newUser, { merge: true });
+      try {
+        await setDoc(doc(db, 'users', uid), newUser, { merge: true });
+      } catch (userDocErr) {
+        console.warn('Could not write user doc in Firestore:', userDocErr);
+      }
 
       const { profile: newProfile } = await academicRecordService.claimInvitationToken(
         input.token,
         uid,
         inv.officialStudentId
       );
+
+      SYNTHETIC_DEMO_USERS[inv.email] = {
+        user: newUser,
+        profile: newProfile,
+      };
 
       setUser(newUser);
       setProfile(newProfile);

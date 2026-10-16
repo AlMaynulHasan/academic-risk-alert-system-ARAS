@@ -17,7 +17,7 @@ import { Card, CardHeader } from '../../../shared/ui/Card';
 import { EmptyState } from '../../../shared/ui/EmptyState';
 import { Skeleton } from '../../../shared/ui/Skeleton';
 import { Button } from '../../../shared/ui/Button';
-import { PROVISIONAL_ATTENDANCE_THRESHOLD, MODULE_OWNERSHIP } from '../../../shared/constants';
+import { PROVISIONAL_ATTENDANCE_THRESHOLD } from '../../../shared/constants';
 import { Notification, Deadline } from '../../../shared/types';
 import {
   BookOpen,

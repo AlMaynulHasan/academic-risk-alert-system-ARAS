@@ -37,25 +37,6 @@ export const ACADEMIC_LEVELS = [
   'Level 4, Term 2',
 ] as const;
 
-export const MODULE_OWNERSHIP = {
-  CORE: {
-    name: 'Core & Academic Base',
-    developer: 'Md. Al-Maynul Hasan (Developer 1)',
-  },
-  STUDENT: {
-    name: 'Student Portal & Records',
-    developer: 'Md. Al-Maynul Hasan (Developer 1)',
-  },
-  RISK: {
-    name: 'Risk Engine & Alerts',
-    developer: 'Md. Al Arafat abir (Developer 2)',
-  },
-  TEACHER: {
-    name: 'Advisor & Interventions',
-    developer: 'Abu Sayed (Developer 3)',
-  },
-} as const;
-
 export interface NavItem {
   label: string;
   path: string;

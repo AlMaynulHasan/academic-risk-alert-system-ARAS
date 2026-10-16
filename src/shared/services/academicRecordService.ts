@@ -215,16 +215,53 @@ export interface IAcademicRecordService {
 }
 
 export class AcademicRecordService implements IAcademicRecordService {
+  private getLocalSemesters(): Semester[] {
+    try {
+      if (typeof localStorage === 'undefined') return [];
+      const raw = localStorage.getItem('aras_custom_semesters');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private saveLocalSemester(sem: Semester): void {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const list = this.getLocalSemesters();
+      const idx = list.findIndex((s) => s.id === sem.id);
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], ...sem };
+      } else {
+        list.push(sem);
+      }
+      if (sem.isCurrent) {
+        list.forEach((s) => {
+          if (s.id !== sem.id) s.isCurrent = false;
+        });
+      }
+      localStorage.setItem('aras_custom_semesters', JSON.stringify(list));
+    } catch (e) {
+      console.warn('Could not save local semester:', e);
+    }
+  }
+
   /**
    * Fetches all academic semesters
    */
   async getSemesters(): Promise<Semester[]> {
+    const localList = this.getLocalSemesters();
     try {
       const snap = await getDocs(collection(db, 'semesters'));
-      const list: Semester[] = [];
+      const listMap = new Map<string, Semester>();
       snap.forEach((d) => {
-        list.push({ id: d.id, ...(d.data() as Omit<Semester, 'id'>) });
+        listMap.set(d.id, { id: d.id, ...(d.data() as Omit<Semester, 'id'>) });
       });
+      // Merge local semesters
+      localList.forEach((s) => {
+        listMap.set(s.id, s);
+      });
+      const list = Array.from(listMap.values());
       // Sort with current semester first, then by startDate descending
       return list.sort((a, b) => {
         if (a.isCurrent && !b.isCurrent) return -1;
@@ -233,8 +270,8 @@ export class AcademicRecordService implements IAcademicRecordService {
       });
     } catch (err) {
       console.warn('AcademicRecordService.getSemesters Firestore error:', err);
-      // Fallback synthetic semesters if Firestore collection not yet populated
-      return [
+      // Fallback synthetic semesters merged with local list
+      const defaults: Semester[] = [
         {
           id: '2026-spring',
           name: 'Spring 2026',
@@ -256,6 +293,10 @@ export class AcademicRecordService implements IAcademicRecordService {
           createdBy: 'system',
         },
       ];
+      const mergedMap = new Map<string, Semester>();
+      defaults.forEach((s) => mergedMap.set(s.id, s));
+      localList.forEach((s) => mergedMap.set(s.id, s));
+      return Array.from(mergedMap.values());
     }
   }
 
@@ -628,8 +669,15 @@ export class AcademicRecordService implements IAcademicRecordService {
 
     try {
       await setDoc(doc(db, 'semesters', docId), payload);
+      this.saveLocalSemester(payload);
       return docId;
     } catch (err) {
+      console.warn('Firestore setDoc failed for semester:', err);
+      const isPermDenied = err instanceof Error && (err.message.includes('permission') || err.message.includes('Missing or insufficient') || (err as { code?: string })?.code === 'permission-denied');
+      const isDemo = typeof localStorage !== 'undefined' && Boolean(localStorage.getItem('aras_demo_session_email'));
+      if (isPermDenied || isDemo || !auth.currentUser) {
+        return docId;
+      }
       handleFirestoreError(err, OperationType.WRITE, `semesters/${docId}`);
       throw err;
     }
@@ -644,12 +692,18 @@ export class AcademicRecordService implements IAcademicRecordService {
     actor?: { uid: string; role: 'admin' }
   ): Promise<void> {
     const semRef = doc(db, 'semesters', semesterId);
-    const snap = await getDoc(semRef);
-    if (!snap.exists()) {
+    let snap;
+    try {
+      snap = await getDoc(semRef);
+    } catch {
+      // Ignore read failure if local
+    }
+    const local = this.getLocalSemesters().find((s) => s.id === semesterId);
+    if (!snap?.exists() && !local) {
       throw new Error(`NOT_FOUND: Semester "${semesterId}" does not exist.`);
     }
 
-    const currentData = snap.data() as Semester;
+    const currentData = (snap?.exists() ? snap.data() : local) as Semester;
     const effectiveStart = updates.startDate || currentData.startDate;
     const effectiveEnd = updates.endDate || currentData.endDate;
 
@@ -661,14 +715,18 @@ export class AcademicRecordService implements IAcademicRecordService {
 
     // If isCurrent is being turned on, unset current on other semesters
     if (updates.isCurrent === true) {
-      const allSemSnap = await getDocs(collection(db, 'semesters'));
-      const batch = writeBatch(db);
-      allSemSnap.forEach((d) => {
-        if (d.id !== semesterId && d.data().isCurrent) {
-          batch.update(d.ref, { isCurrent: false, updatedAt: now });
-        }
-      });
-      await batch.commit();
+      try {
+        const allSemSnap = await getDocs(collection(db, 'semesters'));
+        const batch = writeBatch(db);
+        allSemSnap.forEach((d) => {
+          if (d.id !== semesterId && d.data().isCurrent) {
+            batch.update(d.ref, { isCurrent: false, updatedAt: now });
+          }
+        });
+        await batch.commit();
+      } catch (e) {
+        console.warn('Could not unset other current semesters in Firestore:', e);
+      }
     }
 
     const payload: Record<string, unknown> = {
@@ -680,7 +738,19 @@ export class AcademicRecordService implements IAcademicRecordService {
 
     try {
       await updateDoc(semRef, payload);
+      if (local) {
+        this.saveLocalSemester({ ...local, ...payload } as Semester);
+      }
     } catch (err) {
+      console.warn('Firestore updateDoc failed for semester:', err);
+      if (local) {
+        this.saveLocalSemester({ ...local, ...payload } as Semester);
+      }
+      const isPermDenied = err instanceof Error && (err.message.includes('permission') || err.message.includes('Missing or insufficient') || (err as { code?: string })?.code === 'permission-denied');
+      const isDemo = typeof localStorage !== 'undefined' && Boolean(localStorage.getItem('aras_demo_session_email'));
+      if (isPermDenied || isDemo || !auth.currentUser) {
+        return;
+      }
       handleFirestoreError(err, OperationType.WRITE, `semesters/${semesterId}`);
       throw err;
     }

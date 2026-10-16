@@ -7,6 +7,7 @@ import { AppShell } from './shared/ui/AppShell';
 import { testConnection } from './shared/firebase';
 
 // Public Auth Pages
+import { LandingPage } from './modules/core/pages/LandingPage';
 import { LoginPage } from './modules/core/pages/LoginPage';
 import { RegisterPage } from './modules/core/pages/RegisterPage';
 import { ActivatePage } from './modules/core/pages/ActivatePage';
@@ -46,7 +47,7 @@ const RootRedirect: React.FC = () => {
   }
 
   if (!user || !role) {
-    return <Navigate to="/login" replace />;
+    return <LandingPage />;
   }
 
   if (role === 'student') {
