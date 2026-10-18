@@ -6,15 +6,10 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
-  Shield,
   HelpCircle,
-  CheckCircle2,
   Calendar,
-  BookOpen,
-  ArrowRight,
   Database,
   Building2,
-  Lock
 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { Button } from '../../../shared/ui/Button';
@@ -113,35 +108,35 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col justify-between font-sans text-slate-900 antialiased selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-slate-100 flex flex-col justify-between font-sans text-slate-900 antialiased selection:bg-[#00a651] selection:text-white">
       {/* Top University Institutional Header */}
-      <header className="bg-[#0b1329] text-white border-b border-slate-800 shadow-sm">
+      <header className="bg-[#053321] text-white border-b border-[#08452c] shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md ring-2 ring-blue-400/30 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-[#00a651] text-white flex items-center justify-center shadow-md ring-2 ring-emerald-400/30 group-hover:scale-105 transition-transform">
               <GraduationCap size={22} />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-base tracking-tight text-white">University Portal</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
                   ARAS
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 hidden sm:block">
+              <p className="text-[11px] text-emerald-200/70 hidden sm:block">
                 Academic Information & Advising System
               </p>
             </div>
           </Link>
 
           <div className="flex items-center gap-4 text-xs">
-            <div className="hidden md:flex items-center gap-2 text-slate-300 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800">
-              <Calendar size={14} className="text-blue-400" />
+            <div className="hidden md:flex items-center gap-2 text-emerald-100 bg-[#032517] px-3 py-1.5 rounded-lg border border-[#08452c]">
+              <Calendar size={14} className="text-[#00a651]" />
               <span>Academic Year 2026 • Spring Semester</span>
             </div>
             <Link
               to="/"
-              className="text-xs text-slate-300 hover:text-white font-medium transition-colors"
+              className="text-xs text-emerald-200 hover:text-white font-medium transition-colors"
             >
               Portal Home
             </Link>
@@ -149,61 +144,16 @@ export const LoginPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Split Authentication Section */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-10 flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-12">
-        {/* Left Side: University Welcome & Campus Bulletins */}
-        <div className="lg:w-1/2 space-y-6">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold">
-              <Building2 size={13} className="text-blue-600" />
-              <span>Official Student & Faculty Gateway</span>
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
-              Academic Advising & Performance Portal
-            </h1>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              Log in to access your course attendance, continuous assessment marks, academic standing, and personalized faculty guidance for the current semester.
-            </p>
-          </div>
-
-          {/* Institutional Campus Notices */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs space-y-3.5">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                <BookOpen size={15} className="text-blue-600" />
-                <span>Academic Guidelines & Notices</span>
-              </span>
-              <span className="text-[11px] text-slate-400">Office of the Registrar</span>
-            </div>
-
-            <div className="space-y-2.5 text-xs text-slate-600">
-              <div className="flex items-start gap-2.5">
-                <CheckCircle2 size={15} className="text-emerald-600 shrink-0 mt-0.5" />
-                <span><strong>Attendance Regulation:</strong> A minimum of 75% attendance is required in each course to be eligible for semester final examinations.</span>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <CheckCircle2 size={15} className="text-blue-600 shrink-0 mt-0.5" />
-                <span><strong>Early Advising Alerts:</strong> Students with declining attendance or test scores receive advisory notifications to schedule support sessions.</span>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <CheckCircle2 size={15} className="text-purple-600 shrink-0 mt-0.5" />
-                <span><strong>Faculty Office Hours:</strong> Course teachers and academic advisors are available for scheduled 1-on-1 consultations.</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Help Strip */}
-          <div className="flex items-center justify-between text-xs text-slate-500 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
-            <span className="flex items-center gap-1.5">
-              <HelpCircle size={14} className="text-slate-400" />
-              <span>Need login assistance? Contact ICT Helpdesk</span>
-            </span>
-            <span className="font-semibold text-blue-600">helpdesk@university.edu</span>
-          </div>
+      {/* Main Centered Authentication Section */}
+      <main className="flex-1 max-w-lg w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col items-center justify-center space-y-4 my-auto">
+        {/* Gateway Badge */}
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-[#006834] text-xs font-semibold shadow-2xs">
+          <Building2 size={14} className="text-[#00a651]" />
+          <span>Official Student & Faculty Gateway</span>
         </div>
 
-        {/* Right Side: Clean University Sign-In Card */}
-        <div className="w-full lg:w-[440px]">
+        {/* Clean University Sign-In Card */}
+        <div className="w-full">
           <div className="bg-white rounded-2xl border border-slate-200/90 p-6 sm:p-8 shadow-[0_4px_6px_-1px_rgba(15,23,42,0.08),0_2px_4px_-2px_rgba(15,23,42,0.06)]">
             <div className="mb-6">
               <h2 className="text-xl font-bold text-slate-900 tracking-tight">
@@ -266,10 +216,10 @@ export const LoginPage: React.FC = () => {
 
               <div className="flex items-center justify-between text-xs">
                 <label className="flex items-center gap-2 text-slate-600 cursor-pointer">
-                  <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5" defaultChecked />
+                  <input type="checkbox" className="rounded border-slate-300 text-[#00a651] focus:ring-[#00a651] h-3.5 w-3.5" defaultChecked />
                   <span>Remember me</span>
                 </label>
-                <Link to="/forgot-password" className="text-blue-600 hover:text-blue-700 font-medium">
+                <Link to="/forgot-password" className="text-[#008744] hover:text-[#006834] font-medium">
                   Forgot password?
                 </Link>
               </div>
@@ -328,7 +278,7 @@ export const LoginPage: React.FC = () => {
                   type="button"
                   onClick={handleSeedDatabase}
                   disabled={isLoading}
-                  className="text-[11px] text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 cursor-pointer"
+                  className="text-[11px] text-[#008744] hover:text-[#006834] font-medium flex items-center gap-1 cursor-pointer"
                   title="Reload default sample records"
                 >
                   <Database size={11} />
@@ -341,7 +291,7 @@ export const LoginPage: React.FC = () => {
                   type="button"
                   onClick={() => handleQuickDemo('student01@example.edu')}
                   disabled={isLoading}
-                  className="p-2 bg-slate-50 hover:bg-blue-50 border border-slate-200 rounded-lg text-left transition-colors cursor-pointer"
+                  className="p-2 bg-slate-50 hover:bg-emerald-50 border border-slate-200 rounded-lg text-left transition-colors cursor-pointer"
                 >
                   <div className="font-semibold text-slate-800 text-[11px]">Student</div>
                   <div className="text-[10px] text-slate-500">Rahim Ahmed</div>
@@ -379,13 +329,22 @@ export const LoginPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Registration Link */}
+            {/* Registration & Activation Link */}
             <div className="mt-4 pt-3 border-t border-slate-100 text-center text-xs text-slate-500">
-              New to the university?{' '}
-              <Link to="/register" className="text-blue-600 hover:text-blue-700 font-semibold">
-                Activate your student account
+              New student pre-registered by Admin?{' '}
+              <Link to="/activate" className="text-[#008744] hover:text-[#006834] font-semibold">
+                Activate account with token &rarr;
               </Link>
             </div>
+          </div>
+
+          {/* Quick Help Strip */}
+          <div className="mt-3.5 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs gap-1.5">
+            <span className="flex items-center gap-1.5">
+              <HelpCircle size={14} className="text-slate-400" />
+              <span>Need login assistance? Contact ICT Helpdesk</span>
+            </span>
+            <span className="font-semibold text-[#008744]">helpdesk@university.edu</span>
           </div>
         </div>
       </main>

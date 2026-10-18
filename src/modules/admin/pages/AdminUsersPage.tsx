@@ -33,6 +33,8 @@ import { AssignAdvisorModal } from '../components/AssignAdvisorModal';
 import { CreateInvitationModal } from '../components/CreateInvitationModal';
 import { CreateCourseOfferingModal } from '../components/CreateCourseOfferingModal';
 import { CreateDepartmentModal } from '../components/CreateDepartmentModal';
+import { CreateTeacherModal } from '../components/CreateTeacherModal';
+import { AssignCourseTeacherModal } from '../components/AssignCourseTeacherModal';
 import { seedSyntheticDatabase } from '../../../shared/firebase/seed';
 import {
   Users,
@@ -56,6 +58,8 @@ import {
   Check,
   Clock,
   XCircle,
+  UserPlus,
+  UserCheck,
 } from 'lucide-react';
 
 export const AdminUsersPage: React.FC = () => {
@@ -71,7 +75,7 @@ export const AdminUsersPage: React.FC = () => {
     | 'semesters'
     | 'enrollments'
     | 'advisors'
-    | 'firebase'
+    | 'operations'
   >('users');
 
   // Loading states
@@ -91,13 +95,19 @@ export const AdminUsersPage: React.FC = () => {
   const [isInvitationModalOpen, setIsInvitationModalOpen] = useState(false);
   const [isOfferingModalOpen, setIsOfferingModalOpen] = useState(false);
   const [isDepartmentModalOpen, setIsDepartmentModalOpen] = useState(false);
+  const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
+  const [isAssignTeacherModalOpen, setIsAssignTeacherModalOpen] = useState(false);
+  const [selectedOfferingForTeacher, setSelectedOfferingForTeacher] = useState<CourseOffering | null>(null);
   const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
+  const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
 
   // Filters & search
   const [userSearch, setUserSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [courseFilter, setCourseFilter] = useState('');
   const [selectedSemesterFilter, setSelectedSemesterFilter] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentStatusFilter, setStudentStatusFilter] = useState<'all' | 'pending' | 'claimed' | 'revoked'>('all');
 
   // Modals
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
@@ -177,6 +187,13 @@ export const AdminUsersPage: React.FC = () => {
     setCopiedTokenId(inv.id);
     showToast(`Activation link copied for ${inv.officialStudentId}!`, 'info');
     setTimeout(() => setCopiedTokenId(null), 2500);
+  };
+
+  const handleCopyCode = (inv: StudentInvitation) => {
+    navigator.clipboard.writeText(inv.token);
+    setCopiedCodeId(inv.id);
+    showToast(`Activation code "${inv.token}" copied for ${inv.officialStudentId}!`, 'info');
+    setTimeout(() => setCopiedCodeId(null), 2500);
   };
 
   const handleRevokeInvitation = async (invitationId: string) => {
@@ -382,14 +399,49 @@ export const AdminUsersPage: React.FC = () => {
         </div>
       )}
 
+      {/* Quick Institutional Metric Badges */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="p-3.5 bg-white border border-slate-200 rounded-xl shadow-2xs">
+          <div className="text-[11px] font-medium text-slate-500 uppercase">Active Term</div>
+          <div className="text-base font-bold text-slate-900 mt-0.5">
+            {semesters.find((s) => s.isCurrent)?.name || 'Spring 2026'}
+          </div>
+          <div className="text-[11px] text-emerald-600 font-medium">In Session</div>
+        </div>
+
+        <div className="p-3.5 bg-white border border-slate-200 rounded-xl shadow-2xs">
+          <div className="text-[11px] font-medium text-slate-500 uppercase">Departments</div>
+          <div className="text-base font-bold text-slate-900 mt-0.5">
+            {departments.length} Units
+          </div>
+          <div className="text-[11px] text-slate-500">{courses.length} Approved Courses</div>
+        </div>
+
+        <div className="p-3.5 bg-white border border-slate-200 rounded-xl shadow-2xs">
+          <div className="text-[11px] font-medium text-slate-500 uppercase">Course Offerings</div>
+          <div className="text-base font-bold text-slate-900 mt-0.5">
+            {offerings.length} Sections
+          </div>
+          <div className="text-[11px] text-blue-600 font-medium">{enrollments.length} Active Enrollments</div>
+        </div>
+
+        <div className="p-3.5 bg-white border border-slate-200 rounded-xl shadow-2xs">
+          <div className="text-[11px] font-medium text-slate-500 uppercase">Student Admissions</div>
+          <div className="text-base font-bold text-slate-900 mt-0.5">
+            {invitations.length} Enrolled
+          </div>
+          <div className="text-[11px] text-[#008744] font-medium">Activation Management</div>
+        </div>
+      </div>
+
       {/* Admin Navigation Tabs */}
-      <div className="flex items-center gap-1 p-1 bg-slate-200/70 border border-slate-300/60 rounded-xl text-xs font-medium overflow-x-auto shadow-2xs">
+      <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-medium shadow-2xs">
         <button
           onClick={() => setActiveTab('users')}
-          className={`py-2 px-3 rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 ${
+          className={`py-2 px-3 rounded-lg transition-all flex items-center gap-1.5 ${
             activeTab === 'users'
               ? 'bg-white text-slate-900 font-semibold shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
           }`}
         >
           <Users size={14} className={activeTab === 'users' ? 'text-blue-600' : 'text-slate-400'} />
@@ -398,22 +450,22 @@ export const AdminUsersPage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('invitations')}
-          className={`py-2 px-3 rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 ${
+          className={`py-2 px-3 rounded-lg transition-all flex items-center gap-1.5 ${
             activeTab === 'invitations'
               ? 'bg-white text-slate-900 font-semibold shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
           }`}
         >
-          <KeyRound size={14} className={activeTab === 'invitations' ? 'text-blue-600' : 'text-slate-400'} />
-          <span>Pre-Registration ({invitations.length})</span>
+          <UserPlus size={14} className={activeTab === 'invitations' ? 'text-[#008744]' : 'text-slate-400'} />
+          <span>Student Registration ({invitations.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('offerings')}
-          className={`py-2 px-3 rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 ${
+          className={`py-2 px-3 rounded-lg transition-all flex items-center gap-1.5 ${
             activeTab === 'offerings'
               ? 'bg-white text-slate-900 font-semibold shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
           }`}
         >
           <Layers size={14} className={activeTab === 'offerings' ? 'text-blue-600' : 'text-slate-400'} />
@@ -422,10 +474,10 @@ export const AdminUsersPage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('departments')}
-          className={`py-2 px-3 rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 ${
+          className={`py-2 px-3 rounded-lg transition-all flex items-center gap-1.5 ${
             activeTab === 'departments'
               ? 'bg-white text-slate-900 font-semibold shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
           }`}
         >
           <Building2 size={14} className={activeTab === 'departments' ? 'text-blue-600' : 'text-slate-400'} />
@@ -434,10 +486,10 @@ export const AdminUsersPage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('courses')}
-          className={`py-2 px-3 rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 ${
+          className={`py-2 px-3 rounded-lg transition-all flex items-center gap-1.5 ${
             activeTab === 'courses'
               ? 'bg-white text-slate-900 font-semibold shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
           }`}
         >
           <BookOpen size={14} className={activeTab === 'courses' ? 'text-blue-600' : 'text-slate-400'} />
@@ -446,10 +498,10 @@ export const AdminUsersPage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('semesters')}
-          className={`py-2 px-3 rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 ${
+          className={`py-2 px-3 rounded-lg transition-all flex items-center gap-1.5 ${
             activeTab === 'semesters'
               ? 'bg-white text-slate-900 font-semibold shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
           }`}
         >
           <Calendar size={14} className={activeTab === 'semesters' ? 'text-blue-600' : 'text-slate-400'} />
@@ -458,10 +510,10 @@ export const AdminUsersPage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('enrollments')}
-          className={`py-2 px-3 rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 ${
+          className={`py-2 px-3 rounded-lg transition-all flex items-center gap-1.5 ${
             activeTab === 'enrollments'
               ? 'bg-white text-slate-900 font-semibold shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
           }`}
         >
           <GraduationCap size={14} className={activeTab === 'enrollments' ? 'text-blue-600' : 'text-slate-400'} />
@@ -470,10 +522,10 @@ export const AdminUsersPage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('advisors')}
-          className={`py-2 px-3 rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 ${
+          className={`py-2 px-3 rounded-lg transition-all flex items-center gap-1.5 ${
             activeTab === 'advisors'
               ? 'bg-white text-slate-900 font-semibold shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
           }`}
         >
           <Shield size={14} className={activeTab === 'advisors' ? 'text-blue-600' : 'text-slate-400'} />
@@ -481,15 +533,15 @@ export const AdminUsersPage: React.FC = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('firebase')}
-          className={`py-2 px-3 rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 ${
-            activeTab === 'firebase'
+          onClick={() => setActiveTab('operations')}
+          className={`py-2 px-3 rounded-lg transition-all flex items-center gap-1.5 ${
+            activeTab === 'operations'
               ? 'bg-white text-slate-900 font-semibold shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
           }`}
         >
-          <Database size={14} className={activeTab === 'firebase' ? 'text-blue-600' : 'text-slate-400'} />
-          <span>Firebase Setup</span>
+          <Database size={14} className={activeTab === 'operations' ? 'text-blue-600' : 'text-slate-400'} />
+          <span>Session Operations</span>
         </button>
       </div>
 
@@ -498,13 +550,23 @@ export const AdminUsersPage: React.FC = () => {
         <Card>
           <CardHeader
             title="User Account Directory & Role-Based Access Control"
-            subtitle="Admins can modify roles; users cannot self-promote. Non-admin role changes are rejected by Firestore security rules."
+            subtitle="Manage university faculty, advisors, administrators, and students. Admins can create new teachers and assign roles."
+            action={
+              <Button
+                size="sm"
+                onClick={() => setIsTeacherModalOpen(true)}
+                className="gap-1.5 text-xs h-8 bg-[#00a651] hover:bg-[#009247] text-white font-semibold"
+              >
+                <UserPlus size={14} />
+                <span>Add Faculty / Teacher</span>
+              </Button>
+            }
           />
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="relative">
                 <Input
-                  placeholder="Search users by name or email..."
+                  placeholder="Search users by name, email, or department..."
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                   className="pl-8 text-xs"
@@ -520,9 +582,9 @@ export const AdminUsersPage: React.FC = () => {
                   className="text-xs"
                 >
                   <option value="all">All Roles ({usersList.length})</option>
+                  <option value="teacher">Teachers & Faculty ({usersList.filter((u) => u.role === 'teacher' || u.role === 'advisor').length})</option>
                   <option value="student">Students ({usersList.filter((u) => u.role === 'student').length})</option>
-                  <option value="teacher">Teachers ({usersList.filter((u) => u.role === 'teacher').length})</option>
-                  <option value="admin">Admins ({usersList.filter((u) => u.role === 'admin').length})</option>
+                  <option value="admin">Administrators ({usersList.filter((u) => u.role === 'admin' || u.role === 'dept_admin').length})</option>
                 </Select>
               </div>
             </div>
@@ -540,9 +602,10 @@ export const AdminUsersPage: React.FC = () => {
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
-                      <th className="py-2.5 px-3">Display Name</th>
+                      <th className="py-2.5 px-3">Name & Academic Profile</th>
                       <th className="py-2.5 px-3">Email Address</th>
-                      <th className="py-2.5 px-3">Current Role</th>
+                      <th className="py-2.5 px-3">Department</th>
+                      <th className="py-2.5 px-3">Role</th>
                       <th className="py-2.5 px-3">Registered At</th>
                       <th className="py-2.5 px-3 text-right">Actions</th>
                     </tr>
@@ -550,21 +613,37 @@ export const AdminUsersPage: React.FC = () => {
                   <tbody className="divide-y divide-slate-100">
                     {filteredUsers.map((u) => (
                       <tr key={u.id} className="hover:bg-slate-50/80">
-                        <td className="py-2.5 px-3 font-semibold text-slate-900">
-                          {u.displayName || 'Unnamed User'}
-                          {u.id === user?.id && (
-                            <span className="ml-2 text-[10px] text-blue-600 font-bold">(You)</span>
+                        <td className="py-2.5 px-3">
+                          <div className="font-semibold text-slate-900 flex items-center gap-1.5">
+                            <span>{u.displayName || 'Unnamed User'}</span>
+                            {u.id === user?.id && (
+                              <span className="text-[10px] text-[#008744] font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">(You)</span>
+                            )}
+                          </div>
+                          {u.designation && (
+                            <div className="text-[11px] text-[#008744] font-medium">
+                              {u.designation} {u.employeeId ? `· Code: ${u.employeeId}` : ''}
+                            </div>
                           )}
                         </td>
                         <td className="py-2.5 px-3 text-slate-600 font-mono text-[11px]">{u.email}</td>
+                        <td className="py-2.5 px-3 text-slate-700">
+                          {u.departmentId || u.assignedDepartment ? (
+                            <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded text-2xs font-semibold text-slate-700">
+                              {u.departmentId || u.assignedDepartment}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-2xs italic">General</span>
+                          )}
+                        </td>
                         <td className="py-2.5 px-3">
                           <span
                             className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
-                              u.role === 'admin'
+                              u.role === 'admin' || u.role === 'dept_admin' || u.role === 'university_admin'
                                 ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                                : u.role === 'teacher'
-                                ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                                : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                : u.role === 'teacher' || u.role === 'advisor'
+                                ? 'bg-emerald-100 text-[#006834] border border-emerald-300 font-bold'
+                                : 'bg-slate-100 text-slate-700 border border-slate-200'
                             }`}
                           >
                             {u.role}
@@ -574,18 +653,35 @@ export const AdminUsersPage: React.FC = () => {
                           {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
                         </td>
                         <td className="py-2.5 px-3 text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedUserToEdit(u);
-                              setNewRole(u.role);
-                            }}
-                            className="h-6 px-2 text-[10px] gap-1"
-                          >
-                            <Edit2 size={10} />
-                            <span>Modify Role</span>
-                          </Button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            {(u.role === 'teacher' || u.role === 'advisor') && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setActiveTab('advisors');
+                                  setIsAdvisorModalOpen(true);
+                                }}
+                                className="h-6 px-2 text-[10px] gap-1 text-[#008744] hover:bg-emerald-50 border-emerald-200"
+                                title="Assign advisee students to this faculty member"
+                              >
+                                <Users size={10} />
+                                <span>Assign Advisees</span>
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedUserToEdit(u);
+                                setNewRole(u.role);
+                              }}
+                              className="h-6 px-2 text-[10px] gap-1"
+                            >
+                              <Edit2 size={10} />
+                              <span>Modify Role</span>
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -597,118 +693,211 @@ export const AdminUsersPage: React.FC = () => {
         </Card>
       )}
 
-      {/* TAB: STUDENT PRE-REGISTRATION & INVITATIONS */}
+      {/* TAB: STUDENT REGISTRATION & INVITATIONS */}
       {activeTab === 'invitations' && (
         <Card>
           <CardHeader
-            title="Official Student Pre-Registration & Tokenized Activation"
-            subtitle="Admin-driven student identity provisioning with 7-day expiring one-time tokens."
+            title="Official Student Registration & Activation Management"
+            subtitle="Central institutional student registration with secure one-time activation codes for student password onboarding."
             action={
               <Button
                 size="sm"
                 onClick={() => setIsInvitationModalOpen(true)}
                 className="gap-1.5 text-xs h-8"
               >
-                <Plus size={13} />
-                <span>Pre-Register Student</span>
+                <UserPlus size={13} />
+                <span>Register New Student</span>
               </Button>
             }
           />
           <CardContent className="space-y-4">
-            {scopedInvitations.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-500">
-                {isDeptAdmin && assignedDept
-                  ? `No student invitations for department ${assignedDept} yet. Click "Pre-Register Student" to generate an activation token.`
-                  : 'No student invitations created yet. Click "Pre-Register Student" to generate an activation token.'}
+            {/* Search & Filter Controls */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1 relative">
+                <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                <Input
+                  type="text"
+                  placeholder="Search registered students by Name, Student ID, Email, Department..."
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  className="pl-8 text-xs h-9"
+                />
               </div>
-            ) : (
-              <div className="overflow-x-auto border border-slate-200 rounded-lg">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-medium">
-                      <th className="py-2.5 px-3">Official Student ID</th>
-                      <th className="py-2.5 px-3">Official Email</th>
-                      <th className="py-2.5 px-3">Department</th>
-                      <th className="py-2.5 px-3">Batch & Section</th>
-                      <th className="py-2.5 px-3">Activation Token</th>
-                      <th className="py-2.5 px-3">Status</th>
-                      <th className="py-2.5 px-3">Expires At</th>
-                      <th className="py-2.5 px-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {scopedInvitations.map((inv) => {
-                      const isExpired = new Date(inv.expiresAt).getTime() < Date.now();
-                      const displayStatus = inv.status === 'pending' && isExpired ? 'expired' : inv.status;
-                      return (
-                        <tr key={inv.id} className="hover:bg-slate-50/50">
-                          <td className="py-2.5 px-3 font-semibold text-slate-900">
-                            {inv.officialStudentId}
-                          </td>
-                          <td className="py-2.5 px-3 text-slate-600">{inv.email}</td>
-                          <td className="py-2.5 px-3 text-slate-600">{inv.department}</td>
-                          <td className="py-2.5 px-3 text-slate-600">
-                            Batch {inv.batch} ({inv.section || 'A'})
-                          </td>
-                          <td className="py-2.5 px-3 font-mono text-2xs text-slate-500">
-                            {inv.token}
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold ${
-                                displayStatus === 'claimed'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : displayStatus === 'pending'
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : displayStatus === 'revoked'
-                                  ? 'bg-red-100 text-red-800'
-                                  : 'bg-slate-100 text-slate-700'
-                              }`}
-                            >
-                              {displayStatus === 'claimed' && <CheckCircle size={10} />}
-                              {displayStatus === 'pending' && <Clock size={10} />}
-                              {displayStatus === 'revoked' && <XCircle size={10} />}
-                              {displayStatus.toUpperCase()}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3 text-2xs text-slate-500">
-                            {new Date(inv.expiresAt).toLocaleDateString()}
-                          </td>
-                          <td className="py-2.5 px-3 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              {inv.status === 'pending' && !isExpired && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopyLink(inv)}
-                                  className="inline-flex items-center gap-1 px-2 py-1 text-2xs border border-slate-200 rounded hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
-                                  title="Copy activation URL"
-                                >
-                                  {copiedTokenId === inv.id ? (
-                                    <Check size={11} className="text-emerald-600" />
-                                  ) : (
-                                    <Copy size={11} />
-                                  )}
-                                  <span>{copiedTokenId === inv.id ? 'Copied' : 'Link'}</span>
-                                </button>
-                              )}
-                              {inv.status === 'pending' && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRevokeInvitation(inv.id)}
-                                  className="px-2 py-1 text-2xs border border-red-200 text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                                >
-                                  Revoke
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+
+              <div className="w-full sm:w-56">
+                <Select
+                  value={studentStatusFilter}
+                  onChange={(e) => setStudentStatusFilter(e.target.value as any)}
+                  className="text-xs h-9"
+                >
+                  <option value="all">All Registration Statuses</option>
+                  <option value="pending">Pending Password Setup</option>
+                  <option value="claimed">Active / Activated</option>
+                  <option value="revoked">Revoked Tokens</option>
+                </Select>
               </div>
-            )}
+            </div>
+
+            {(() => {
+              const filteredList = scopedInvitations.filter((inv) => {
+                const q = studentSearch.toLowerCase().trim();
+                const matchesSearch =
+                  !q ||
+                  inv.officialStudentId.toLowerCase().includes(q) ||
+                  (inv.displayName || '').toLowerCase().includes(q) ||
+                  inv.email.toLowerCase().includes(q) ||
+                  inv.department.toLowerCase().includes(q);
+
+                const isExpired = new Date(inv.expiresAt).getTime() < Date.now();
+                const displayStatus = inv.status === 'pending' && isExpired ? 'expired' : inv.status;
+                const matchesStatus =
+                  studentStatusFilter === 'all'
+                    ? true
+                    : studentStatusFilter === 'pending'
+                    ? displayStatus === 'pending'
+                    : displayStatus === studentStatusFilter;
+
+                return matchesSearch && matchesStatus;
+              });
+
+              if (filteredList.length === 0) {
+                return (
+                  <div className="py-12 text-center text-xs text-slate-500 bg-slate-50 rounded-lg border border-slate-200">
+                    {studentSearch || studentStatusFilter !== 'all'
+                      ? 'No registered students match your filter criteria.'
+                      : 'No student registrations recorded yet. Click "Register New Student" above to enroll a student and issue their activation code.'}
+                  </div>
+                );
+              }
+
+              return (
+                <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                        <th className="py-2.5 px-3">Student Name & ID</th>
+                        <th className="py-2.5 px-3">Official Email</th>
+                        <th className="py-2.5 px-3">Department & Level</th>
+                        <th className="py-2.5 px-3">Batch & Sec</th>
+                        <th className="py-2.5 px-3">Assigned Advisor</th>
+                        <th className="py-2.5 px-3">Activation Code</th>
+                        <th className="py-2.5 px-3">Status</th>
+                        <th className="py-2.5 px-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredList.map((inv) => {
+                        const isExpired = new Date(inv.expiresAt).getTime() < Date.now();
+                        const displayStatus = inv.status === 'pending' && isExpired ? 'expired' : inv.status;
+                        const advisor = teachersList.find((t) => t.id === inv.advisorId);
+
+                        return (
+                          <tr key={inv.id} className="hover:bg-slate-50/60">
+                            <td className="py-2.5 px-3">
+                              <div className="font-semibold text-slate-900">
+                                {inv.displayName || inv.officialStudentId}
+                              </div>
+                              <div className="text-[11px] font-mono text-[#006834] font-medium">
+                                {inv.officialStudentId}
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-600 font-mono text-[11px]">{inv.email}</td>
+                            <td className="py-2.5 px-3 text-slate-700">
+                              <div className="font-medium text-slate-800">{inv.department}</div>
+                              <div className="text-[10px] text-slate-400">{inv.level || 'Level 1, Term 1'}</div>
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-600">
+                              Batch {inv.batch} (Sec {inv.section || 'A'})
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-700">
+                              {advisor ? (
+                                <span className="text-[11px] text-emerald-800 font-medium">
+                                  {advisor.displayName}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-2xs italic">Unassigned</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-2xs font-semibold px-2 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-800">
+                                  {inv.token}
+                                </span>
+                                {inv.status === 'pending' && !isExpired && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyCode(inv)}
+                                    className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-emerald-700 transition-colors"
+                                    title="Copy activation code only"
+                                  >
+                                    {copiedCodeId === inv.id ? (
+                                      <Check size={12} className="text-emerald-600" />
+                                    ) : (
+                                      <Copy size={12} />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold ${
+                                  displayStatus === 'claimed'
+                                    ? 'bg-emerald-100 text-[#006834]'
+                                    : displayStatus === 'pending'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : displayStatus === 'revoked'
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-slate-100 text-slate-700'
+                                }`}
+                              >
+                                {displayStatus === 'claimed' && <CheckCircle size={10} />}
+                                {displayStatus === 'pending' && <Clock size={10} />}
+                                {displayStatus === 'revoked' && <XCircle size={10} />}
+                                {displayStatus === 'claimed' ? 'ACTIVATED' : displayStatus.toUpperCase()}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {inv.status === 'pending' && !isExpired && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyLink(inv)}
+                                    className="inline-flex items-center gap-1 px-2 py-1 text-2xs border border-emerald-200 bg-emerald-50/60 rounded hover:bg-emerald-100 text-[#006834] font-medium transition-colors cursor-pointer"
+                                    title="Copy full activation link for student"
+                                  >
+                                    {copiedTokenId === inv.id ? (
+                                      <Check size={11} className="text-emerald-600" />
+                                    ) : (
+                                      <Copy size={11} />
+                                    )}
+                                    <span>{copiedTokenId === inv.id ? 'Copied' : 'Link'}</span>
+                                  </button>
+                                )}
+                                {inv.status === 'pending' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRevokeInvitation(inv.id)}
+                                    className="px-2 py-1 text-2xs border border-red-200 text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                                  >
+                                    Revoke
+                                  </button>
+                                )}
+                                {inv.status === 'claimed' && (
+                                  <span className="text-[10px] text-emerald-700 font-medium">
+                                    Enrolled & Active
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       )}
@@ -748,6 +937,7 @@ export const AdminUsersPage: React.FC = () => {
                       <th className="py-2.5 px-3">Assigned Faculty</th>
                       <th className="py-2.5 px-3">Capacity</th>
                       <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -777,13 +967,24 @@ export const AdminUsersPage: React.FC = () => {
                             {assignedTeachers.length > 0 ? (
                               <div className="space-y-0.5">
                                 {assignedTeachers.map((t) => (
-                                  <div key={t.id} className="text-2xs font-medium text-slate-800">
-                                    {t.displayName}
+                                  <div key={t.id} className="text-2xs font-semibold text-slate-900 flex items-center gap-1">
+                                    <UserCheck size={11} className="text-[#00a651]" />
+                                    <span>{t.displayName}</span>
                                   </div>
                                 ))}
                               </div>
                             ) : (
-                              <span className="text-slate-400 italic text-2xs">Unassigned</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedOfferingForTeacher(off);
+                                  setIsAssignTeacherModalOpen(true);
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded text-2xs font-semibold hover:bg-amber-100 cursor-pointer"
+                              >
+                                <UserPlus size={10} />
+                                <span>Assign Teacher</span>
+                              </button>
                             )}
                           </td>
                           <td className="py-2.5 px-3 text-slate-600">{off.capacity || 50} seats</td>
@@ -797,6 +998,21 @@ export const AdminUsersPage: React.FC = () => {
                             >
                               {(off.status || 'active').toUpperCase()}
                             </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedOfferingForTeacher(off);
+                                setIsAssignTeacherModalOpen(true);
+                              }}
+                              className="h-6 px-2 text-[10px] gap-1 text-[#008744] hover:bg-emerald-50 border-emerald-200"
+                              title="Assign or change course teacher"
+                            >
+                              <UserCheck size={11} />
+                              <span>{assignedTeachers.length > 0 ? 'Change Faculty' : 'Assign Faculty'}</span>
+                            </Button>
                           </td>
                         </tr>
                       );
@@ -1151,17 +1367,28 @@ export const AdminUsersPage: React.FC = () => {
       {activeTab === 'advisors' && (
         <Card>
           <CardHeader
-            title="Faculty Advisor Allocations"
-            subtitle="Controls advisee scope. Teachers are restricted by Security Rules to only query students actively assigned to them."
+            title="Faculty Advisor Allocations & Advisee Scope"
+            subtitle="Link students to appointed faculty advisors. Advisors receive academic risk alerts and manage advising interventions."
             action={
-              <Button
-                size="sm"
-                onClick={() => setIsAdvisorModalOpen(true)}
-                className="gap-1.5 text-xs h-8"
-              >
-                <Plus size={14} />
-                <span>Assign Advisor</span>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsTeacherModalOpen(true)}
+                  className="gap-1.5 text-xs h-8 text-[#008744] hover:bg-emerald-50 border-emerald-200"
+                >
+                  <UserPlus size={13} />
+                  <span>New Faculty</span>
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setIsAdvisorModalOpen(true)}
+                  className="gap-1.5 text-xs h-8 bg-[#00a651] hover:bg-[#009247] text-white"
+                >
+                  <Plus size={14} />
+                  <span>Assign Advisees</span>
+                </Button>
+              </div>
             }
           />
           <CardContent className="space-y-4">
@@ -1228,60 +1455,63 @@ export const AdminUsersPage: React.FC = () => {
         </Card>
       )}
 
-      {/* TAB 6: FIREBASE SETUP & SEEDING */}
-      {activeTab === 'firebase' && (
+      {/* TAB: ACADEMIC SESSION OPERATIONS */}
+      {activeTab === 'operations' && (
         <div className="space-y-6">
           <Card>
             <CardHeader
-              title="Firebase Configuration & Authentication Diagnostics"
-              subtitle="Audit insights regarding auth/operation-not-allowed and Firestore permissions"
+              title="Academic Session Governance & Institutional Data Health"
+              subtitle="Overview of academic record integrity, session lifecycle, and catalog synchronization"
             />
-            <CardContent className="space-y-4 text-xs">
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-950 space-y-2">
-                <div className="flex items-center gap-2 font-semibold">
-                  <AlertTriangle size={16} className="text-amber-700 shrink-0" />
-                  <span>Audit Root-Cause Analysis: auth/operation-not-allowed</span>
+            <CardContent className="space-y-5 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    Current Term
+                  </div>
+                  <div className="text-base font-bold text-slate-900 mt-1">
+                    {semesters.find((s) => s.isCurrent)?.name || 'Spring 2026'}
+                  </div>
+                  <div className="text-[11px] text-emerald-600 font-medium mt-0.5 flex items-center gap-1">
+                    <CheckCircle size={12} />
+                    <span>Active Academic Session</span>
+                  </div>
                 </div>
-                <p className="leading-relaxed text-[11px] text-amber-900">
-                  When running CLI seeding scripts (<code>npx tsx scripts/seed.ts</code>), the Firebase client returned{' '}
-                  <code className="font-mono font-bold">auth/operation-not-allowed</code>. In newly provisioned Google Cloud Firebase projects, the <strong>Email/Password Authentication Provider</strong> is disabled by default until explicitly enabled by the project owner in the Firebase Console.
-                </p>
-                <p className="leading-relaxed text-[11px] text-amber-900">
-                  Because user creation failed, subsequent writes attempted unauthenticated requests, triggering{' '}
-                  <code className="font-mono font-bold">7 PERMISSION_DENIED</code> as required by our strict Zero-Trust{' '}
-                  <code className="font-mono">firestore.rules</code>.
-                </p>
+
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    Curriculum Scope
+                  </div>
+                  <div className="text-base font-bold text-slate-900 mt-1">
+                    {courses.length} Approved Courses
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    Across {departments.length} Academic Departments
+                  </div>
+                </div>
+
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    Active Offerings
+                  </div>
+                  <div className="text-base font-bold text-slate-900 mt-1">
+                    {offerings.length} Scheduled Sections
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    {enrollments.length} Active Course Registrations
+                  </div>
+                </div>
               </div>
 
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
-                <strong className="text-slate-900 block font-semibold">Firebase Console Activation Checklist:</strong>
-                <ol className="list-decimal pl-5 space-y-1 text-slate-700 leading-relaxed text-[11px]">
-                  <li>
-                    Open Firebase Console:{' '}
-                    <a
-                      href="https://console.firebase.google.com/project/gen-lang-client-0164331162/authentication/providers"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-blue-600 underline font-mono inline-flex items-center gap-0.5"
-                    >
-                      Authentication Providers <ExternalLink size={11} />
-                    </a>
-                  </li>
-                  <li>Click on <strong>Sign-in method</strong> tab.</li>
-                  <li>Select <strong>Email/Password</strong> and toggle <strong>Enable</strong>, then click <strong>Save</strong>.</li>
-                  <li>Once enabled, users can register and login securely via email/password credentials.</li>
-                </ol>
-              </div>
-
-              {/* In-App Seeder */}
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              {/* Institutional Synchronization & Reset Card */}
+              <div className="p-5 bg-blue-50/70 border border-blue-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                  <h4 className="font-semibold text-blue-950 flex items-center gap-1.5">
-                    <Database size={15} className="text-blue-700" />
-                    <span>In-Browser Synthetic Database Seeder</span>
+                  <h4 className="font-semibold text-blue-950 flex items-center gap-1.5 text-sm">
+                    <Database size={16} className="text-blue-700" />
+                    <span>Institutional Catalog & Sample Data Synchronization</span>
                   </h4>
-                  <p className="text-[11px] text-blue-800 mt-0.5">
-                    Populate courses, semesters, sample students, faculty advisors, and demo marks directly from this active session.
+                  <p className="text-xs text-blue-800/80 mt-1 leading-relaxed max-w-xl">
+                    Populate or refresh the official university catalog, academic departments (CSE, EEE, CE, ME), active term schedules, sample student records, and faculty mentor allocations.
                   </p>
                 </div>
                 <Button
@@ -1291,7 +1521,7 @@ export const AdminUsersPage: React.FC = () => {
                   className="shrink-0 text-xs"
                 >
                   <RefreshCw size={13} className={isSeeding ? 'animate-spin' : ''} />
-                  <span>Seed Demo Database</span>
+                  <span>Synchronize Catalog Records</span>
                 </Button>
               </div>
             </CardContent>
@@ -1398,6 +1628,7 @@ export const AdminUsersPage: React.FC = () => {
           isOpen={isInvitationModalOpen}
           onClose={() => setIsInvitationModalOpen(false)}
           departments={departments}
+          advisors={teachersList}
           onCreated={() => loadAllAdminData()}
         />
       )}
@@ -1420,6 +1651,30 @@ export const AdminUsersPage: React.FC = () => {
           isOpen={isDepartmentModalOpen}
           onClose={() => setIsDepartmentModalOpen(false)}
           onCreated={() => loadAllAdminData()}
+        />
+      )}
+
+      {/* Add Teacher / Faculty Member Modal */}
+      {isTeacherModalOpen && (
+        <CreateTeacherModal
+          isOpen={isTeacherModalOpen}
+          onClose={() => setIsTeacherModalOpen(false)}
+          departments={departments}
+          onCreated={() => loadAllAdminData()}
+        />
+      )}
+
+      {/* Assign Course Teacher Modal */}
+      {isAssignTeacherModalOpen && selectedOfferingForTeacher && (
+        <AssignCourseTeacherModal
+          isOpen={isAssignTeacherModalOpen}
+          onClose={() => {
+            setIsAssignTeacherModalOpen(false);
+            setSelectedOfferingForTeacher(null);
+          }}
+          offering={selectedOfferingForTeacher}
+          teachers={teachersList}
+          onSaved={() => loadAllAdminData()}
         />
       )}
     </div>

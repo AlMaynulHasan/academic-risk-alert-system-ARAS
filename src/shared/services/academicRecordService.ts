@@ -35,6 +35,7 @@ export interface EnrollmentSummary {
   enrollmentId: string;
   studentId: string;
   courseId: string;
+  courseOfferingId?: string;
   courseCode: string;
   courseTitle: string;
   credits: number;
@@ -1512,11 +1513,14 @@ export class AcademicRecordService implements IAcademicRecordService {
       id: docId,
       token,
       officialStudentId: cleanStudentId,
+      displayName: invitation.displayName?.trim() || cleanStudentId,
       email: cleanEmail,
       department: invitation.department.trim(),
       batch: invitation.batch?.trim() || '2026',
       section: invitation.section?.trim() || 'A',
       level: invitation.level?.trim() || 'Level 1, Term 1',
+      phone: invitation.phone?.trim() || undefined,
+      advisorId: invitation.advisorId || undefined,
       status: 'pending',
       expiresAt,
       createdAt: now,
@@ -1650,6 +1654,25 @@ export class AcademicRecordService implements IAcademicRecordService {
       await setDoc(doc(db, 'studentProfiles', studentUid), profilePayload, { merge: true });
     } catch (err) {
       console.warn('Profile write in demo mode note:', err);
+    }
+
+    if (inv.advisorId) {
+      const assignId = `${inv.advisorId}_${studentUid}`;
+      const advisorPayload = {
+        id: assignId,
+        teacherId: inv.advisorId,
+        studentId: studentUid,
+        assignedDate: now.split('T')[0],
+        status: 'active' as const,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: 'admin_registration',
+      };
+      try {
+        await setDoc(doc(db, 'advisorAssignments', assignId), advisorPayload, { merge: true });
+      } catch (err) {
+        console.warn('Could not auto-create advisor assignment doc:', err);
+      }
     }
 
     return {

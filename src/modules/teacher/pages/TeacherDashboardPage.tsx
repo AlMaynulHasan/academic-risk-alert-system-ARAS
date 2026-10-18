@@ -155,13 +155,13 @@ export const TeacherDashboardPage: React.FC = () => {
       />
 
       {/* Institutional Faculty Portal Banner */}
-      <div className="p-4 bg-gradient-to-r from-[#0b1329] via-[#0f172a] to-[#1e293b] border border-slate-800 rounded-xl text-xs text-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm">
+      <div className="p-4 bg-gradient-to-r from-[#043321] via-[#06422b] to-[#085537] border border-[#095938] rounded-xl text-xs text-emerald-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm">
         <div className="flex items-center gap-2.5">
-          <span className="font-bold tracking-wider text-[10px] px-2 py-0.5 bg-blue-600 text-white rounded shadow-xs">
+          <span className="font-bold tracking-wider text-[10px] px-2 py-0.5 bg-[#00a651] text-white rounded shadow-xs">
             FACULTY PORTAL
           </span>
-          <span className="text-slate-300">
-            Faculty Advisor: <strong className="text-white">{user?.displayName || user?.email}</strong> · Advisees scoped by <code className="font-mono text-blue-300 bg-blue-950/70 px-1.5 py-0.5 rounded border border-blue-900/60 text-[11px]">advisorAssignments</code>
+          <span className="text-emerald-100/90">
+            Faculty Advisor: <strong className="text-white">{user?.displayName || user?.email}</strong> · Advisees scoped by <code className="font-mono text-emerald-200 bg-[#032517] px-1.5 py-0.5 rounded border border-emerald-700/60 text-[11px]">advisorAssignments</code>
           </span>
         </div>
         <div className="flex items-center gap-2 text-slate-300 text-[11px] shrink-0 font-medium">

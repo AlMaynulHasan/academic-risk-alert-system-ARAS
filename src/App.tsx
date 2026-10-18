@@ -28,6 +28,8 @@ import { TeacherDashboardPage } from './modules/teacher/pages/TeacherDashboardPa
 import { TeacherStudentsPage } from './modules/teacher/pages/TeacherStudentsPage';
 import { StudentDetailPage } from './modules/teacher/pages/StudentDetailPage';
 import { TeacherInterventionsPage } from './modules/teacher/pages/TeacherInterventionsPage';
+import { TeacherAttendancePage } from './modules/teacher/pages/TeacherAttendancePage';
+import { TeacherMarksPage } from './modules/teacher/pages/TeacherMarksPage';
 
 // Admin Pages
 import { AdminUsersPage } from './modules/admin/pages/AdminUsersPage';
@@ -103,12 +105,14 @@ export default function App() {
             <Route
               path="/teacher/*"
               element={
-                <ProtectedRoute allowedRoles={['teacher', 'admin']}>
+                <ProtectedRoute allowedRoles={['teacher', 'advisor']}>
                   <AppShell>
                     <Routes>
                       <Route path="dashboard" element={<TeacherDashboardPage />} />
                       <Route path="students" element={<TeacherStudentsPage />} />
                       <Route path="students/:id" element={<StudentDetailPage />} />
+                      <Route path="attendance" element={<TeacherAttendancePage />} />
+                      <Route path="marks" element={<TeacherMarksPage />} />
                       <Route path="interventions" element={<TeacherInterventionsPage />} />
                       <Route path="*" element={<Navigate to="/teacher/dashboard" replace />} />
                     </Routes>
@@ -121,7 +125,7 @@ export default function App() {
             <Route
               path="/admin/*"
               element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={['admin', 'university_admin', 'dept_admin']}>
                   <AppShell>
                     <Routes>
                       <Route path="users" element={<AdminUsersPage />} />

@@ -12,6 +12,10 @@ export interface User {
   role: UserRole;
   departmentId?: string;
   assignedDepartment?: string;
+  designation?: string;
+  employeeId?: string;
+  phone?: string;
+  officeRoom?: string;
   advisorSectionIds?: string[];
   avatarUrl?: string;
   createdAt: string; // UTC ISO 8601
@@ -99,11 +103,14 @@ export interface StudentInvitation {
   id: string; // Token ID / Document ID
   token: string; // Unique activation token
   officialStudentId: string; // University Roll/Reg ID, e.g. 'CSE-2022-041'
+  displayName?: string; // Student Full Name pre-registered by Admin
   email: string;
   department: string;
   batch: string;
   section?: string;
   level?: string;
+  phone?: string;
+  advisorId?: string;
   status: 'pending' | 'claimed' | 'expired' | 'revoked';
   expiresAt: string; // ISO 8601
   claimedAt?: string;
@@ -155,6 +162,18 @@ export interface Enrollment {
   createdAt: string;
   updatedAt: string;
   createdBy: string;
+}
+
+export interface EnrollmentSummary {
+  enrollmentId: string;
+  studentId: string;
+  courseId: string;
+  courseOfferingId?: string;
+  courseCode: string;
+  courseTitle: string;
+  credits: number;
+  semesterId: string;
+  status: Enrollment['status'];
 }
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';

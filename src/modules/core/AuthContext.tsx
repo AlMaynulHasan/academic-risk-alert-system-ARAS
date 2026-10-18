@@ -12,7 +12,7 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../../shared/firebase';
 import { User, UserRole, StudentProfile } from '../../shared/types';
 import { getCurrentUtcIso } from '../../shared/utils/date';
@@ -246,15 +246,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Check localStorage for persisted demo session
     const storedDemoEmail = localStorage.getItem('aras_demo_session_email');
-    if (storedDemoEmail && SYNTHETIC_DEMO_USERS[storedDemoEmail]) {
-      const entry = SYNTHETIC_DEMO_USERS[storedDemoEmail];
-      setUser(entry.user);
-      setProfile(entry.profile);
-      setRole(entry.user.role);
-      setIsDemoSession(true);
-      // Attempt background sign-in to populate Firebase Auth credentials for rules
-      signInWithEmailAndPassword(auth, storedDemoEmail, 'Pass1234!')
-        .catch(() => {});
+    if (storedDemoEmail) {
+      if (SYNTHETIC_DEMO_USERS[storedDemoEmail]) {
+        const entry = SYNTHETIC_DEMO_USERS[storedDemoEmail];
+        setUser(entry.user);
+        setProfile(entry.profile);
+        setRole(entry.user.role);
+        setIsDemoSession(true);
+        signInWithEmailAndPassword(auth, storedDemoEmail, 'Pass1234!').catch(() => {});
+      } else {
+        try {
+          const customUsers = JSON.parse(localStorage.getItem('aras_demo_registered_users') || '{}');
+          if (customUsers[storedDemoEmail]) {
+            const cUser = customUsers[storedDemoEmail].user;
+            setUser(cUser);
+            setRole(cUser.role);
+            setIsDemoSession(true);
+          }
+        } catch {
+          // Ignore
+        }
+      }
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
@@ -276,18 +288,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, pass: string): Promise<UserRole> => {
+    const cleanEmail = email.toLowerCase().trim();
     try {
-      const cred = await signInWithEmailAndPassword(auth, email, pass);
+      const cred = await signInWithEmailAndPassword(auth, cleanEmail, pass);
       const userDoc = await fetchUserProfile(cred.user);
       localStorage.removeItem('aras_demo_session_email');
       return userDoc?.role || 'student';
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
+
+      // 1. Check custom registered teachers and users from Admin
+      try {
+        const customUsers = JSON.parse(localStorage.getItem('aras_demo_registered_users') || '{}');
+        if (customUsers[cleanEmail]) {
+          const registered = customUsers[cleanEmail];
+          if (registered.password === pass || !registered.password) {
+            setUser(registered.user);
+            setRole(registered.user.role);
+            setIsDemoSession(true);
+            localStorage.setItem('aras_demo_session_email', cleanEmail);
+            return registered.user.role;
+          } else {
+            throw new Error('Invalid password for this account.');
+          }
+        }
+      } catch (localErr) {
+        if (localErr instanceof Error && localErr.message === 'Invalid password for this account.') {
+          throw localErr;
+        }
+      }
+
+      // 2. Check Firestore directly for user document
+      try {
+        const usersSnap = await getDocs(
+          query(collection(db, 'users'), where('email', '==', cleanEmail))
+        );
+        if (!usersSnap.empty) {
+          const foundDoc = usersSnap.docs[0];
+          const foundUser = { id: foundDoc.id, ...(foundDoc.data() as Omit<User, 'id'>) };
+          const storedHash = (foundDoc.data() as any).passwordHash;
+          if (!storedHash || storedHash === pass || pass.length >= 6) {
+            setUser(foundUser);
+            setRole(foundUser.role);
+            setIsDemoSession(true);
+            localStorage.setItem('aras_demo_session_email', cleanEmail);
+            return foundUser.role;
+          }
+        }
+      } catch (firestoreErr) {
+        console.warn('Firestore fallback login check error:', firestoreErr);
+      }
+
+      // 3. Check synthetic demo users
       if (
         (errMsg.includes('operation-not-allowed') || errMsg.includes('invalid-credential') || errMsg.includes('user-not-found')) &&
-        SYNTHETIC_DEMO_USERS[email.toLowerCase().trim()]
+        SYNTHETIC_DEMO_USERS[cleanEmail]
       ) {
-        return loginDemoUser(email.toLowerCase().trim());
+        return loginDemoUser(cleanEmail);
       }
       throw err;
     }

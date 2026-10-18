@@ -45,9 +45,7 @@ export const ActivatePage: React.FC = () => {
     try {
       const inv = await academicRecordService.verifyInvitationToken(cleanTok);
       setInvitation(inv);
-      if (!displayName) {
-        setDisplayName(inv.officialStudentId);
-      }
+      setDisplayName(inv.displayName || inv.officialStudentId);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Invalid or expired invitation token.';
       setVerificationError(msg);
@@ -108,7 +106,7 @@ export const ActivatePage: React.FC = () => {
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-10 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="w-12 h-12 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-xs">
+          <div className="w-12 h-12 rounded-lg bg-[#00a651] flex items-center justify-center text-white shadow-xs">
             <KeyRound size={26} />
           </div>
         </div>
@@ -139,8 +137,8 @@ export const ActivatePage: React.FC = () => {
               {/* Step 1: Token Input & Verification */}
               {!invitation ? (
                 <form onSubmit={handleManualVerify} className="space-y-4">
-                  <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-lg text-xs text-blue-800 flex items-start gap-2">
-                    <ShieldCheck className="shrink-0 text-blue-600 mt-0.5" size={16} />
+                  <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-lg text-xs text-emerald-900 flex items-start gap-2">
+                    <ShieldCheck className="shrink-0 text-[#00a651] mt-0.5" size={16} />
                     <span>
                       Students must be pre-registered by university administration. Enter the activation token provided in your official department invitation.
                     </span>
@@ -172,7 +170,7 @@ export const ActivatePage: React.FC = () => {
 
                   <div className="pt-2 text-center text-xs text-slate-500">
                     Already activated your account?{' '}
-                    <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
+                    <Link to="/login" className="font-medium text-[#008744] hover:text-[#006834]">
                       Sign in here
                     </Link>
                   </div>
@@ -181,14 +179,20 @@ export const ActivatePage: React.FC = () => {
                 /* Step 2: Confirmation & Password Setup */
                 <form onSubmit={handleActivateSubmit} className="space-y-5">
                   <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg space-y-2">
-                    <div className="flex items-center gap-2 text-emerald-800 font-semibold text-xs">
-                      <CheckCircle2 size={16} className="text-emerald-600" />
+                    <div className="flex items-center gap-2 text-[#006834] font-semibold text-xs">
+                      <CheckCircle2 size={16} className="text-[#00a651]" />
                       <span>Verified Official Student Record</span>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs text-slate-700 pt-1">
+                      {invitation.displayName && (
+                        <div className="col-span-2 pb-1 border-b border-emerald-100">
+                          <span className="text-slate-400 block text-[11px]">Enrolled Student Name:</span>
+                          <span className="font-bold text-sm text-slate-900">{invitation.displayName}</span>
+                        </div>
+                      )}
                       <div>
-                        <span className="text-slate-400 block">Student ID:</span>
-                        <span className="font-semibold text-slate-900">{invitation.officialStudentId}</span>
+                        <span className="text-slate-400 block">Student ID / Roll:</span>
+                        <span className="font-semibold text-slate-900 font-mono">{invitation.officialStudentId}</span>
                       </div>
                       <div>
                         <span className="text-slate-400 block">Department:</span>
@@ -201,13 +205,13 @@ export const ActivatePage: React.FC = () => {
                       <div>
                         <span className="text-slate-400 block">Batch / Level:</span>
                         <span className="font-semibold text-slate-900">
-                          {invitation.batch} {invitation.level ? `(${invitation.level})` : ''}
+                          Batch {invitation.batch} {invitation.level ? `(${invitation.level})` : ''}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  <FormField label="Full Name" required>
+                  <FormField label="Full Name (Account Profile)" required>
                     <Input
                       type="text"
                       value={displayName}

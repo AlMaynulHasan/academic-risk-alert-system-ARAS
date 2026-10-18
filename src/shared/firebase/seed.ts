@@ -41,6 +41,12 @@ export async function seedSyntheticDatabase(): Promise<SeedResult> {
       displayName: 'System Admin (Demo)',
       role: 'admin' as const,
     },
+    {
+      email: 'maynulhasan625@gmail.com',
+      password: 'Pass1234!',
+      displayName: 'Md. Al-Maynul Hasan (Administrator)',
+      role: 'admin' as const,
+    },
   ];
 
   const uidMap: Record<string, string> = {};
@@ -67,16 +73,30 @@ export async function seedSyntheticDatabase(): Promise<SeedResult> {
       }
     }
 
-    if (uid) {
-      uidMap[u.email] = uid;
-      await setDoc(doc(db, 'users', uid), {
-        id: uid,
+    const fallbackId = u.email.includes('student01')
+      ? 'demo-student-01'
+      : u.email.includes('student02')
+      ? 'demo-student-02'
+      : u.email.includes('teacher')
+      ? 'demo-teacher-01'
+      : u.email.includes('maynul')
+      ? 'demo-admin-maynul'
+      : 'demo-admin-01';
+
+    const effectiveUid = uid || fallbackId;
+    uidMap[u.email] = effectiveUid;
+
+    try {
+      await setDoc(doc(db, 'users', effectiveUid), {
+        id: effectiveUid,
         email: u.email,
         displayName: u.displayName,
         role: u.role,
         createdAt: now,
         updatedAt: now,
-      });
+      }, { merge: true });
+    } catch (writeErr) {
+      console.warn(`Could not save user ${u.email} to Firestore:`, writeErr);
     }
   }
 
@@ -138,85 +158,177 @@ export async function seedSyntheticDatabase(): Promise<SeedResult> {
     createdBy: 'system',
   });
 
-  // 4. semesters
+  // 4. departments
+  const depts = [
+    { id: 'dept_cse', code: 'CSE', name: 'Computer Science and Engineering', headOfDeptId: t1Uid },
+    { id: 'dept_eee', code: 'EEE', name: 'Electrical and Electronic Engineering', headOfDeptId: '' },
+    { id: 'dept_ce', code: 'CE', name: 'Civil Engineering', headOfDeptId: '' },
+    { id: 'dept_me', code: 'ME', name: 'Mechanical Engineering', headOfDeptId: '' },
+  ];
+  for (const dept of depts) {
+    await setDoc(doc(db, 'departments', dept.id), {
+      ...dept,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: 'system',
+    }, { merge: true });
+  }
+
+  // 5. semesters
   await setDoc(doc(db, 'semesters', '2026-spring'), {
     id: '2026-spring',
     name: 'Spring 2026',
     startDate: '2026-01-15',
     endDate: '2026-05-30',
     isCurrent: true,
+    isClosed: false,
     createdAt: now,
     updatedAt: now,
     createdBy: 'system',
-  });
+  }, { merge: true });
 
-  // 5. courses
-  await setDoc(doc(db, 'courses', 'cse-311'), {
-    id: 'cse-311',
-    code: 'CSE311',
-    title: 'Database Management Systems',
-    credits: 3,
-    department: 'CSE',
+  await setDoc(doc(db, 'semesters', '2026-summer'), {
+    id: '2026-summer',
+    name: 'Summer 2026',
+    startDate: '2026-06-01',
+    endDate: '2026-09-30',
+    isCurrent: false,
+    isClosed: false,
     createdAt: now,
     updatedAt: now,
     createdBy: 'system',
-  });
+  }, { merge: true });
 
-  await setDoc(doc(db, 'courses', 'cse-321'), {
-    id: 'cse-321',
-    code: 'CSE321',
-    title: 'Operating Systems',
-    credits: 3,
-    department: 'CSE',
-    createdAt: now,
-    updatedAt: now,
-    createdBy: 'system',
-  });
+  // 6. courses
+  const courseList = [
+    { id: 'cse-101', code: 'CSE101', title: 'Structured Programming Language', credits: 3, department: 'CSE' },
+    { id: 'cse-211', code: 'CSE211', title: 'Data Structures & Algorithms', credits: 3, department: 'CSE' },
+    { id: 'cse-311', code: 'CSE311', title: 'Database Management Systems', credits: 3, department: 'CSE' },
+    { id: 'cse-321', code: 'CSE321', title: 'Operating Systems', credits: 3, department: 'CSE' },
+    { id: 'cse-331', code: 'CSE331', title: 'Software Engineering', credits: 3, department: 'CSE' },
+  ];
+  for (const c of courseList) {
+    await setDoc(doc(db, 'courses', c.id), {
+      ...c,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: 'system',
+    }, { merge: true });
+  }
 
-  await setDoc(doc(db, 'courses', 'cse-331'), {
-    id: 'cse-331',
-    code: 'CSE331',
-    title: 'Software Engineering',
-    credits: 3,
-    department: 'CSE',
-    createdAt: now,
-    updatedAt: now,
-    createdBy: 'system',
-  });
+  // 7. courseOfferings
+  const offeringsData = [
+    {
+      id: 'off_2026-spring_cse311_1',
+      courseId: 'cse-311',
+      courseCode: 'CSE311',
+      semesterId: '2026-spring',
+      section: '01',
+      teacherIds: [t1Uid],
+      capacity: 40,
+      enrolledCount: 2,
+    },
+    {
+      id: 'off_2026-spring_cse331_1',
+      courseId: 'cse-331',
+      courseCode: 'CSE331',
+      semesterId: '2026-spring',
+      section: '01',
+      teacherIds: [t1Uid],
+      capacity: 40,
+      enrolledCount: 1,
+    },
+    {
+      id: 'off_2026-spring_cse101_1',
+      courseId: 'cse-101',
+      courseCode: 'CSE101',
+      semesterId: '2026-spring',
+      section: '01',
+      teacherIds: [t1Uid],
+      capacity: 45,
+      enrolledCount: 0,
+    },
+  ];
+  for (const off of offeringsData) {
+    await setDoc(doc(db, 'courseOfferings', off.id), {
+      ...off,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: 'system',
+    }, { merge: true });
+  }
 
-  // 6. enrollments
+  // 8. studentInvitations (Pre-registration)
+  const invitationsData = [
+    {
+      id: 'inv_cse_2022_045',
+      token: 'INV-CSE-2022-045-88A1',
+      officialStudentId: 'CSE-2022-045',
+      email: 'student03@example.edu',
+      department: 'CSE',
+      batch: '2022',
+      level: 'Level 3, Term 1',
+      status: 'pending' as const,
+      expiresAt: '2026-12-31T23:59:59.000Z',
+    },
+    {
+      id: 'inv_cse_2022_092',
+      token: 'INV-CSE-2022-092-99B2',
+      officialStudentId: 'CSE-2022-092',
+      email: 'student04@example.edu',
+      department: 'CSE',
+      batch: '2022',
+      level: 'Level 3, Term 1',
+      status: 'pending' as const,
+      expiresAt: '2026-12-31T23:59:59.000Z',
+    },
+  ];
+  for (const inv of invitationsData) {
+    await setDoc(doc(db, 'studentInvitations', inv.id), {
+      ...inv,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: 'system',
+    }, { merge: true });
+  }
+
+  // 9. enrollments
   await setDoc(doc(db, 'enrollments', `enr_${s1Uid}_cse311`), {
     id: `enr_${s1Uid}_cse311`,
     studentId: s1Uid,
     courseId: 'cse-311',
+    courseOfferingId: 'off_2026-spring_cse311_1',
     semesterId: '2026-spring',
     status: 'enrolled',
     createdAt: now,
     updatedAt: now,
     createdBy: 'system',
-  });
+  }, { merge: true });
 
   await setDoc(doc(db, 'enrollments', `enr_${s1Uid}_cse331`), {
     id: `enr_${s1Uid}_cse331`,
     studentId: s1Uid,
     courseId: 'cse-331',
+    courseOfferingId: 'off_2026-spring_cse331_1',
     semesterId: '2026-spring',
     status: 'enrolled',
     createdAt: now,
     updatedAt: now,
     createdBy: 'system',
-  });
+  }, { merge: true });
 
   await setDoc(doc(db, 'enrollments', `enr_${s2Uid}_cse311`), {
     id: `enr_${s2Uid}_cse311`,
     studentId: s2Uid,
     courseId: 'cse-311',
+    courseOfferingId: 'off_2026-spring_cse311_1',
     semesterId: '2026-spring',
     status: 'enrolled',
     createdAt: now,
     updatedAt: now,
     createdBy: 'system',
-  });
+  }, { merge: true });
 
   // 7. attendanceRecords
   await setDoc(doc(db, 'attendanceRecords', `att_${s1Uid}_2026-03-01`), {

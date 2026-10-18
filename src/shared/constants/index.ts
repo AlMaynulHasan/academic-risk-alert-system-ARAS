@@ -55,10 +55,18 @@ export const STUDENT_NAV: NavItem[] = [
 
 export const TEACHER_NAV: NavItem[] = [
   { label: 'Dashboard', path: '/teacher/dashboard', iconName: 'LayoutDashboard' },
-  { label: 'My Students', path: '/teacher/students', iconName: 'Users' },
+  { label: 'Course Attendance', path: '/teacher/attendance', iconName: 'CalendarCheck' },
+  { label: 'Grades & Marks', path: '/teacher/marks', iconName: 'GraduationCap' },
+  { label: 'Enrolled Students', path: '/teacher/students', iconName: 'Users' },
   { label: 'Interventions', path: '/teacher/interventions', iconName: 'ShieldAlert' },
 ];
 
+export const ADVISOR_NAV: NavItem[] = [
+  { label: 'Dashboard', path: '/teacher/dashboard', iconName: 'LayoutDashboard' },
+  { label: 'My Advisees', path: '/teacher/students', iconName: 'Users' },
+  { label: 'Interventions & Mentorship', path: '/teacher/interventions', iconName: 'ShieldAlert' },
+];
+
 export const ADMIN_NAV: NavItem[] = [
-  { label: 'User Directory', path: '/admin/users', iconName: 'ShieldCheck' },
+  { label: 'Admin Console', path: '/admin/users', iconName: 'ShieldCheck' },
 ];

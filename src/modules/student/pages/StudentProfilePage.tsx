@@ -9,24 +9,16 @@ import { Button } from '../../../shared/ui/Button';
 import { StatusBadge } from '../../../shared/ui/StatusBadge';
 import { useToast } from '../../../shared/ui/Toast';
 import { StudentProfile } from '../../../shared/types';
-import { Lock, Save, Shield, AlertCircle, CheckCircle2, User as UserIcon } from 'lucide-react';
+import { Lock, Shield, AlertCircle, CheckCircle2, ShieldCheck, FileCheck2 } from 'lucide-react';
 
 export const StudentProfilePage: React.FC = () => {
-  const { user, profile: authProfile, role, updateStudentProfile, changePassword } = useAuth();
+  const { user, profile: authProfile, role, changePassword } = useAuth();
   const { showToast } = useToast();
 
   const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(authProfile);
   const [loadingProfile, setLoadingProfile] = useState(false);
 
-  // Profile Edit form state (permitted fields only)
-  const [displayName, setDisplayName] = useState(user?.displayName || '');
-  const [phone, setPhone] = useState(authProfile?.phone || '');
-  const [emergencyContact, setEmergencyContact] = useState(authProfile?.emergencyContact || '');
-  const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
-  const [profileError, setProfileError] = useState<string | null>(null);
-
-  // Password Change form state
+  // Password Change form state (Exclusive permitted self-service action)
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -36,52 +28,19 @@ export const StudentProfilePage: React.FC = () => {
 
   useEffect(() => {
     if (user?.id) {
-      setDisplayName(user.displayName || '');
       setLoadingProfile(true);
       academicRecordService
         .getStudentProfile(user.id)
         .then((p) => {
           if (p) {
             setStudentProfile(p);
-            setPhone(p.phone || '');
-            setEmergencyContact(p.emergencyContact || '');
           } else if (authProfile) {
             setStudentProfile(authProfile);
-            setPhone(authProfile.phone || '');
-            setEmergencyContact(authProfile.emergencyContact || '');
           }
         })
         .finally(() => setLoadingProfile(false));
     }
   }, [user?.id, authProfile]);
-
-  const handleProfileSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setProfileError(null);
-    setProfileSuccess(null);
-
-    if (displayName.trim().length < 2) {
-      setProfileError('Display name must be at least 2 characters.');
-      return;
-    }
-
-    setIsSavingProfile(true);
-    try {
-      await updateStudentProfile({
-        displayName: displayName.trim(),
-        phone: phone.trim(),
-        emergencyContact: emergencyContact.trim(),
-      });
-      setProfileSuccess('Profile updated successfully.');
-      showToast('Profile changes saved successfully.', 'success');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to update profile.';
-      setProfileError(msg);
-      showToast(msg, 'error');
-    } finally {
-      setIsSavingProfile(false);
-    }
-  };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,8 +65,8 @@ export const StudentProfilePage: React.FC = () => {
     setIsChangingPass(true);
     try {
       await changePassword(currentPassword, newPassword);
-      setPassSuccess('Password changed successfully.');
-      showToast('Your account password has been updated.', 'success');
+      setPassSuccess('Account password changed successfully.');
+      showToast('Your account security password has been updated.', 'success');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmNewPassword('');
@@ -126,165 +85,148 @@ export const StudentProfilePage: React.FC = () => {
     }
   };
 
+  // Determine display values without hardcoding other student records
+  const officialName = user?.displayName || studentProfile?.studentId || 'Enrolled Student';
+  const officialId = studentProfile?.studentId || user?.displayName || 'Pending Official ID';
+  const officialDept = studentProfile?.department || 'Computer Science & Engineering';
+  const officialBatch = studentProfile?.batch || '2026';
+  const officialLevel = studentProfile?.level || 'Level 1, Term 1';
+  const officialEmail = user?.email || '';
+
+  // CGPA: If null or undefined (new student), display N/A - NEVER hardcode to 3.42!
+  const cgpaDisplay =
+    studentProfile?.cgpa !== null && studentProfile?.cgpa !== undefined
+      ? studentProfile.cgpa.toFixed(2)
+      : 'N/A (Pending Semester Evaluation)';
+
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl mx-auto pb-12">
       <PageHeader
         title="Student Profile & Security"
-        description="Review institutional records, update personal contact details, and manage authentication credentials."
+        description="View officially verified university academic credentials and manage your account password."
         breadcrumbs={[{ label: 'Student', href: '/student/dashboard' }, { label: 'Profile' }]}
       />
 
       <div className="grid grid-cols-1 gap-6">
-        {/* Section 1: Institutional Academic Records (Read-Only) */}
+        {/* Section 1: Institutional Academic Identification (Read-Only) */}
         <Card>
           <CardHeader
-            title="Academic Identification"
-            subtitle="Verified academic attributes governed by the university registrar (Immutable for students)"
+            title="Official Academic Identification"
+            subtitle="Verified credentials registered with the University Academic Council and Examination Controller"
+            action={
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md text-xs font-semibold">
+                <ShieldCheck size={14} className="text-emerald-600" />
+                <span>Verified Official Record</span>
+              </div>
+            }
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            <FormField label="University Student ID">
+            <FormField label="Official Student Name">
               <Input
                 disabled
-                value={studentProfile?.studentId || 'CSE-2022-041'}
+                value={officialName}
+                className="bg-slate-50 font-semibold text-xs text-slate-800"
+              />
+            </FormField>
+
+            <FormField label="University Student ID / Roll">
+              <Input
+                disabled
+                value={officialId}
                 className="bg-slate-50 font-mono text-xs font-semibold text-slate-800"
               />
             </FormField>
 
-            <FormField label="Department">
+            <FormField label="Academic Department">
               <Input
                 disabled
-                value={studentProfile?.department || 'Computer Science and Engineering'}
+                value={officialDept}
                 className="bg-slate-50 text-xs text-slate-800"
               />
             </FormField>
 
-            <FormField label="Academic Level">
+            <FormField label="Academic Level & Term">
               <Input
                 disabled
-                value={studentProfile?.level || 'Level 3, Term 1'}
+                value={officialLevel}
                 className="bg-slate-50 text-xs text-slate-800"
               />
             </FormField>
 
-            <FormField label="Batch / Year">
+            <FormField label="Admission Batch / Year">
               <Input
                 disabled
-                value={studentProfile?.batch || '2022'}
+                value={officialBatch}
                 className="bg-slate-50 text-xs text-slate-800"
               />
             </FormField>
 
-            <FormField label="Current Semester">
+            <FormField label="Current Semester Session">
               <Input
                 disabled
                 value="Spring 2026"
-                className="bg-slate-50 text-xs text-slate-800"
+                className="bg-slate-50 text-xs text-slate-800 font-medium"
               />
             </FormField>
 
-            <FormField label="Cumulative GPA">
+            <FormField label="Cumulative GPA (CGPA)">
               <Input
                 disabled
-                value={studentProfile?.cgpa !== null && studentProfile?.cgpa !== undefined ? studentProfile.cgpa.toFixed(2) : '3.42'}
-                className="bg-slate-50 font-mono text-xs text-slate-800 font-semibold"
+                value={cgpaDisplay}
+                className={`bg-slate-50 font-mono text-xs font-semibold ${
+                  studentProfile?.cgpa === null || studentProfile?.cgpa === undefined
+                    ? 'text-slate-500 italic'
+                    : 'text-slate-900'
+                }`}
               />
             </FormField>
 
-            <FormField label="Account Role">
-              <div className="pt-1.5 flex items-center gap-2">
-                <StatusBadge status={role || 'student'} variant="info" />
-                <span className="text-[11px] text-slate-500">Fixed student privileges</span>
-              </div>
-            </FormField>
-
-            <FormField label="Email Address">
+            <FormField label="University Institutional Email">
               <Input
                 disabled
-                value={user?.email || 'student01@example.edu'}
+                value={officialEmail}
                 className="bg-slate-50 text-xs text-slate-700"
               />
             </FormField>
+
+            <FormField label="Account Role & Privileges">
+              <div className="pt-1.5 flex items-center gap-2">
+                <StatusBadge status={role || 'student'} variant="info" />
+                <span className="text-[11px] text-slate-500">Fixed Student Advisee</span>
+              </div>
+            </FormField>
+          </div>
+
+          {/* Institutional Integrity Notice */}
+          <div className="mt-5 p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 space-y-1.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-900">
+              <FileCheck2 size={15} className="text-blue-600" />
+              <span>Transcript & Certificate Integrity Policy</span>
+            </div>
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              Official identity attributes (Student Name, Registration Roll ID, Department, Batch, and Cumulative GPA) are permanently locked against student self-modification. This institutional safeguard prevents discrepancies on official transcripts, semester grade sheets, and degree certificates. For official corrections, please contact the Office of the Controller of Examinations or your Department Coordinator.
+            </p>
           </div>
         </Card>
 
-        {/* Section 2: Editable Student Contact Information (Permitted Fields) */}
+        {/* Section 2: Account Security - Change Password (Permitted Self-Service) */}
         <Card>
           <CardHeader
-            title="Personal & Contact Information"
-            subtitle="Permitted profile fields editable by student (name, contact phone, emergency contact)"
-          />
-
-          {profileSuccess && (
-            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-md text-xs text-emerald-800 flex items-center gap-2">
-              <CheckCircle2 size={16} className="shrink-0" />
-              <span>{profileSuccess}</span>
-            </div>
-          )}
-
-          {profileError && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-xs text-red-700 flex items-center gap-2">
-              <AlertCircle size={16} className="shrink-0" />
-              <span>{profileError}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleProfileSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              <FormField label="Full Name" required hint="Display name across student portal">
-                <Input
-                  type="text"
-                  required
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="e.g. Rahim Ahmed"
-                />
-              </FormField>
-
-              <FormField label="Phone Number" hint="Primary mobile contact">
-                <Input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+880 1700 000000"
-                />
-              </FormField>
-
-              <FormField label="Emergency Contact" hint="Parent / guardian telephone">
-                <Input
-                  type="tel"
-                  value={emergencyContact}
-                  onChange={(e) => setEmergencyContact(e.target.value)}
-                  placeholder="+880 1800 000000"
-                />
-              </FormField>
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <Button type="submit" size="sm" isLoading={isSavingProfile} className="gap-1.5 text-xs">
-                <Save size={14} /> Save Profile Changes
-              </Button>
-            </div>
-          </form>
-        </Card>
-
-        {/* Section 3: Change Password (Requires recent re-authentication) */}
-        <Card>
-          <CardHeader
-            title="Authentication & Security"
-            subtitle="Change account password (Mandatory re-authentication with current password)"
+            title="Account Security & Password Management"
+            subtitle="Update your student portal login password with verification of your current password"
           />
 
           {passSuccess && (
             <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-md text-xs text-emerald-800 flex items-center gap-2">
-              <CheckCircle2 size={16} className="shrink-0" />
+              <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
               <span>{passSuccess}</span>
             </div>
           )}
 
           {passError && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-xs text-red-700 flex items-center gap-2">
-              <AlertCircle size={16} className="shrink-0" />
+              <AlertCircle size={16} className="shrink-0 text-red-600" />
               <span>{passError}</span>
             </div>
           )}
@@ -294,7 +236,7 @@ export const StudentProfilePage: React.FC = () => {
               <FormField
                 label="Current Password"
                 required
-                hint="Required for re-authentication"
+                hint="Required for verification"
               >
                 <Input
                   type="password"
@@ -336,14 +278,19 @@ export const StudentProfilePage: React.FC = () => {
               </FormField>
             </div>
 
-            <div className="flex items-center justify-between pt-2">
-              <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                <Shield size={13} className="text-blue-600" />
-                Firebase credential re-authentication protects against unauthorized password takeover.
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
+              <span className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                <Shield size={14} className="text-blue-600 shrink-0" />
+                <span>Password changes take effect immediately across all active portal sessions.</span>
               </span>
 
-              <Button type="submit" variant="outline" size="sm" isLoading={isChangingPass} className="gap-1.5 text-xs">
-                <Lock size={14} /> Update Password
+              <Button
+                type="submit"
+                size="sm"
+                isLoading={isChangingPass}
+                className="gap-1.5 text-xs px-4"
+              >
+                <Lock size={14} /> Update Account Password
               </Button>
             </div>
           </form>

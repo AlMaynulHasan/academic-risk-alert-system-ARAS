@@ -16,7 +16,7 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const baseClasses =
-    'inline-flex items-center justify-center font-medium rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/40 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer select-none';
+    'inline-flex items-center justify-center font-medium rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00a651]/50 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer select-none';
 
   const sizeClasses = {
     sm: 'text-xs px-3 py-1.5 h-8 gap-1.5',
@@ -25,11 +25,11 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const variantClasses = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 shadow-xs',
-    secondary: 'bg-slate-100 text-slate-900 hover:bg-slate-200 active:bg-slate-300',
-    outline: 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 active:bg-slate-100',
+    primary: 'bg-[#00a651] text-white hover:bg-[#009247] active:bg-[#007f3d] shadow-xs',
+    secondary: 'bg-emerald-50 text-emerald-900 hover:bg-emerald-100 active:bg-emerald-200 border border-emerald-200/80',
+    outline: 'border border-slate-300 bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 hover:border-emerald-300 active:bg-emerald-100',
     danger: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 shadow-xs',
-    ghost: 'text-slate-600 hover:text-slate-900 hover:bg-slate-100',
+    ghost: 'text-slate-600 hover:text-emerald-800 hover:bg-emerald-50',
   };
 
   return (

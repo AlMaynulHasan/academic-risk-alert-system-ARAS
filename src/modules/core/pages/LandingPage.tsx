@@ -40,18 +40,18 @@ export const LandingPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased flex flex-col selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased flex flex-col selection:bg-[#00a651] selection:text-white">
       {/* University Institutional Masthead */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#0b1329] flex items-center justify-center text-white shadow-sm ring-2 ring-blue-500/20">
-              <GraduationCap size={22} className="text-blue-400" />
+            <div className="w-10 h-10 rounded-xl bg-[#053321] flex items-center justify-center text-white shadow-sm ring-2 ring-[#00a651]/30">
+              <GraduationCap size={22} className="text-[#00a651]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-base tracking-tight text-slate-900">University Portal</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-[#006834] border border-emerald-300">
                   ARAS
                 </span>
               </div>
@@ -62,10 +62,10 @@ export const LandingPage: React.FC = () => {
           </div>
 
           <nav className="hidden md:flex items-center gap-6 text-xs font-semibold text-slate-600">
-            <a href="#overview" className="hover:text-blue-600 transition-colors">Overview</a>
-            <a href="#services" className="hover:text-blue-600 transition-colors">Portals & Services</a>
-            <a href="#regulations" className="hover:text-blue-600 transition-colors">Academic Regulations</a>
-            <a href="#advising" className="hover:text-blue-600 transition-colors">Advising & Support</a>
+            <a href="#overview" className="hover:text-[#008744] transition-colors">Overview</a>
+            <a href="#services" className="hover:text-[#008744] transition-colors">Portals & Services</a>
+            <a href="#regulations" className="hover:text-[#008744] transition-colors">Academic Regulations</a>
+            <a href="#advising" className="hover:text-[#008744] transition-colors">Advising & Support</a>
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
@@ -76,7 +76,7 @@ export const LandingPage: React.FC = () => {
                   else if (role === 'teacher') navigate('/teacher/dashboard');
                   else navigate('/admin/users');
                 }}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-2 transition-all cursor-pointer"
+                className="px-4 py-2 bg-[#00a651] hover:bg-[#009247] text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-2 transition-all cursor-pointer"
               >
                 <span>Go to Dashboard</span>
                 <ArrowRight size={14} />
@@ -85,14 +85,14 @@ export const LandingPage: React.FC = () => {
               <>
                 <Link
                   to="/login"
-                  className="px-4 py-2 bg-[#0b1329] hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-2 transition-all cursor-pointer"
+                  className="px-4 py-2 bg-[#053321] hover:bg-[#08452c] text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-2 transition-all cursor-pointer"
                 >
                   <LogIn size={14} />
                   <span>Sign In</span>
                 </Link>
                 <Link
-                  to="/register"
-                  className="hidden sm:inline-flex px-3.5 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                  to="/activate"
+                  className="hidden sm:inline-flex px-3.5 py-2 bg-white hover:bg-emerald-50 border border-slate-300 text-slate-700 hover:text-[#008744] rounded-lg text-xs font-semibold transition-all cursor-pointer"
                 >
                   Student Activation
                 </Link>
@@ -105,17 +105,17 @@ export const LandingPage: React.FC = () => {
       {/* Main Content */}
       <main className="flex-1">
         {/* ========================================================
-            HERO SECTION
+            HERO SECTION (Rich Forest Green & Tia Accents)
            ======================================================== */}
-        <section id="overview" className="relative bg-[#080e22] text-white overflow-hidden py-16 sm:py-24 border-b border-slate-800">
-          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none" />
-          <div className="absolute -top-32 right-0 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-32 left-0 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
+        <section id="overview" className="relative bg-gradient-to-br from-[#021f13] via-[#053522] to-[#04281a] text-white overflow-hidden py-16 sm:py-24 border-b border-[#08452c]">
+          <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#00a651_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none" />
+          <div className="absolute -top-32 right-0 w-96 h-96 bg-[#00a651]/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-32 left-0 w-96 h-96 bg-emerald-600/15 rounded-full blur-3xl pointer-events-none" />
 
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             <div className="text-center max-w-3xl mx-auto">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/15 border border-blue-400/30 text-blue-300 text-xs font-semibold mb-6 shadow-sm">
-                <Building2 size={14} className="text-blue-400" />
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#032517]/90 border border-[#00a651]/50 text-emerald-200 text-xs font-semibold mb-6 shadow-sm">
+                <Building2 size={14} className="text-[#00a651]" />
                 <span>Spring 2026 Academic Term • University Advisory System</span>
               </div>
 
@@ -123,14 +123,14 @@ export const LandingPage: React.FC = () => {
                 Student Academic Success & Advising Portal
               </h1>
 
-              <p className="mt-5 text-sm sm:text-base text-slate-300 max-w-2xl mx-auto leading-relaxed">
+              <p className="mt-5 text-sm sm:text-base text-emerald-100/90 max-w-2xl mx-auto leading-relaxed">
                 A centralized university platform providing students and faculty with real-time academic records, automated attendance tracking, continuous mark assessments, and proactive academic advising.
               </p>
 
               <div className="mt-8 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
                 <Link
                   to="/login"
-                  className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs sm:text-sm shadow-md hover:shadow-lg flex items-center gap-2 transition-all cursor-pointer"
+                  className="px-6 py-3 rounded-xl bg-[#00a651] hover:bg-[#009247] text-white font-semibold text-xs sm:text-sm shadow-md hover:shadow-lg flex items-center gap-2 transition-all cursor-pointer"
                 >
                   <LogIn size={16} />
                   <span>Sign In to Student/Faculty Portal</span>
@@ -138,51 +138,51 @@ export const LandingPage: React.FC = () => {
 
                 <a
                   href="#services"
-                  className="px-6 py-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-xs sm:text-sm flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+                  className="px-6 py-3 rounded-xl bg-[#032517]/90 hover:bg-[#053321] border border-[#08452c] text-emerald-100 font-semibold text-xs sm:text-sm flex items-center gap-2 transition-all cursor-pointer shadow-sm"
                 >
-                  <BookOpen size={16} className="text-blue-400" />
+                  <BookOpen size={16} className="text-[#00a651]" />
                   <span>Explore Academic Services</span>
                 </a>
               </div>
 
-              {/* 4 University Pillars */}
+              {/* 4 University Pillars in Green/Tia Style */}
               <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3 text-left">
-                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 backdrop-blur-xs">
-                  <div className="text-blue-400 font-bold text-xs uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <div className="p-3.5 rounded-xl bg-[#032517]/85 border border-[#08452c] backdrop-blur-xs">
+                  <div className="text-[#00a651] font-bold text-xs uppercase tracking-wider mb-1 flex items-center gap-1.5">
                     <Clock size={14} />
                     <span>Attendance</span>
                   </div>
-                  <div className="text-xs text-slate-300">
+                  <div className="text-xs text-emerald-100/80">
                     Live class attendance tracking with 75% final exam eligibility threshold.
                   </div>
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 backdrop-blur-xs">
-                  <div className="text-emerald-400 font-bold text-xs uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <div className="p-3.5 rounded-xl bg-[#032517]/85 border border-[#08452c] backdrop-blur-xs">
+                  <div className="text-[#00a651] font-bold text-xs uppercase tracking-wider mb-1 flex items-center gap-1.5">
                     <BarChart3 size={14} />
                     <span>Continuous Marks</span>
                   </div>
-                  <div className="text-xs text-slate-300">
+                  <div className="text-xs text-emerald-100/80">
                     Immediate grade recording for quizzes, assignments, and midterms.
                   </div>
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 backdrop-blur-xs">
+                <div className="p-3.5 rounded-xl bg-[#032517]/85 border border-[#08452c] backdrop-blur-xs">
                   <div className="text-amber-400 font-bold text-xs uppercase tracking-wider mb-1 flex items-center gap-1.5">
                     <BellRing size={14} />
                     <span>Advisory Alerts</span>
                   </div>
-                  <div className="text-xs text-slate-300">
+                  <div className="text-xs text-emerald-100/80">
                     Early notification for students needing academic support before finals.
                   </div>
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 backdrop-blur-xs">
-                  <div className="text-purple-400 font-bold text-xs uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <div className="p-3.5 rounded-xl bg-[#032517]/85 border border-[#08452c] backdrop-blur-xs">
+                  <div className="text-emerald-300 font-bold text-xs uppercase tracking-wider mb-1 flex items-center gap-1.5">
                     <HeartHandshake size={14} />
                     <span>Faculty Advising</span>
                   </div>
-                  <div className="text-xs text-slate-300">
+                  <div className="text-xs text-emerald-100/80">
                     1-on-1 advisor consultations and structured milestone action plans.
                   </div>
                 </div>
@@ -197,7 +197,7 @@ export const LandingPage: React.FC = () => {
         <section id="services" className="py-14 bg-slate-100/90 border-b border-slate-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center max-w-2xl mx-auto mb-10">
-              <span className="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#008744] bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
                 Institutional Portals
               </span>
               <h2 className="mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
@@ -212,7 +212,7 @@ export const LandingPage: React.FC = () => {
               {/* Student Hub */}
               <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
                 <div>
-                  <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center mb-4">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-50 text-[#00a651] border border-emerald-200 flex items-center justify-center mb-4">
                     <GraduationCap size={24} />
                   </div>
                   <h3 className="text-lg font-bold text-slate-900 mb-1">Student Portal</h3>
@@ -221,15 +221,15 @@ export const LandingPage: React.FC = () => {
                   </p>
                   <ul className="space-y-1.5 text-xs text-slate-600 mb-6">
                     <li className="flex items-center gap-2">
-                      <CheckCircle2 size={14} className="text-emerald-600" />
+                      <CheckCircle2 size={14} className="text-[#00a651]" />
                       <span>Class attendance & exam eligibility status</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <CheckCircle2 size={14} className="text-emerald-600" />
+                      <CheckCircle2 size={14} className="text-[#00a651]" />
                       <span>Continuous marks breakdown by assessment</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <CheckCircle2 size={14} className="text-emerald-600" />
+                      <CheckCircle2 size={14} className="text-[#00a651]" />
                       <span>Upcoming assignment and exam deadlines</span>
                     </li>
                   </ul>
@@ -239,7 +239,7 @@ export const LandingPage: React.FC = () => {
                   <button
                     onClick={() => handleLaunchRole('student01@example.edu', '/student/dashboard')}
                     disabled={isLoadingRole !== null}
-                    className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                    className="w-full py-2.5 px-4 bg-[#00a651] hover:bg-[#009247] text-white rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                   >
                     <span>Enter Student Portal</span>
                     <ChevronRight size={14} />
@@ -257,7 +257,7 @@ export const LandingPage: React.FC = () => {
               {/* Faculty & Advisor Portal */}
               <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
                 <div>
-                  <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mb-4">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-50 text-[#008744] border border-emerald-200 flex items-center justify-center mb-4">
                     <Users size={24} />
                   </div>
                   <h3 className="text-lg font-bold text-slate-900 mb-1">Faculty & Advisor Portal</h3>
@@ -266,15 +266,15 @@ export const LandingPage: React.FC = () => {
                   </p>
                   <ul className="space-y-1.5 text-xs text-slate-600 mb-6">
                     <li className="flex items-center gap-2">
-                      <CheckCircle2 size={14} className="text-emerald-600" />
+                      <CheckCircle2 size={14} className="text-[#00a651]" />
                       <span>Daily section attendance recording</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <CheckCircle2 size={14} className="text-emerald-600" />
+                      <CheckCircle2 size={14} className="text-[#00a651]" />
                       <span>Course marks entry & grade distribution</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <CheckCircle2 size={14} className="text-emerald-600" />
+                      <CheckCircle2 size={14} className="text-[#00a651]" />
                       <span>At-risk student advising interventions</span>
                     </li>
                   </ul>
@@ -284,7 +284,7 @@ export const LandingPage: React.FC = () => {
                   <button
                     onClick={() => handleLaunchRole('teacher01@example.edu', '/teacher/dashboard')}
                     disabled={isLoadingRole !== null}
-                    className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                    className="w-full py-2.5 px-4 bg-[#053321] hover:bg-[#08452c] text-white rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                   >
                     <span>Enter Faculty Portal</span>
                     <ChevronRight size={14} />
@@ -298,7 +298,7 @@ export const LandingPage: React.FC = () => {
               {/* Administration */}
               <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
                 <div>
-                  <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 border border-purple-200 flex items-center justify-center mb-4">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-50 text-[#00a651] border border-emerald-200 flex items-center justify-center mb-4">
                     <ShieldCheck size={24} />
                   </div>
                   <h3 className="text-lg font-bold text-slate-900 mb-1">Academic Administration</h3>
@@ -307,15 +307,15 @@ export const LandingPage: React.FC = () => {
                   </p>
                   <ul className="space-y-1.5 text-xs text-slate-600 mb-6">
                     <li className="flex items-center gap-2">
-                      <CheckCircle2 size={14} className="text-emerald-600" />
+                      <CheckCircle2 size={14} className="text-[#00a651]" />
                       <span>Institutional user & role management</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <CheckCircle2 size={14} className="text-emerald-600" />
+                      <CheckCircle2 size={14} className="text-[#00a651]" />
                       <span>Course offerings & faculty allocations</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <CheckCircle2 size={14} className="text-emerald-600" />
+                      <CheckCircle2 size={14} className="text-[#00a651]" />
                       <span>Audit logging and academic term settings</span>
                     </li>
                   </ul>
@@ -325,7 +325,7 @@ export const LandingPage: React.FC = () => {
                   <button
                     onClick={() => handleLaunchRole('maynulhasan625@gmail.com', '/admin/users')}
                     disabled={isLoadingRole !== null}
-                    className="w-full py-2.5 px-4 bg-[#0b1329] hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                    className="w-full py-2.5 px-4 bg-[#053321] hover:bg-[#08452c] text-white rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
                   >
                     <span>Enter Administrator Portal</span>
                     <ChevronRight size={14} />
@@ -345,7 +345,7 @@ export const LandingPage: React.FC = () => {
         <section id="regulations" className="py-16 bg-white border-b border-slate-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="max-w-3xl mx-auto text-center mb-12">
-              <span className="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#008744] bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
                 Official Policies
               </span>
               <h2 className="mt-2 text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
@@ -357,8 +357,8 @@ export const LandingPage: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center mb-3">
+              <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl hover:border-emerald-300 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-[#008744] flex items-center justify-center mb-3">
                   <FileCheck2 size={20} />
                 </div>
                 <h3 className="font-bold text-slate-900 text-base mb-2">75% Attendance Rule</h3>
@@ -367,7 +367,7 @@ export const LandingPage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl">
+              <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl hover:border-emerald-300 transition-colors">
                 <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center mb-3">
                   <BellRing size={20} />
                 </div>
@@ -377,8 +377,8 @@ export const LandingPage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl">
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3">
+              <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl hover:border-emerald-300 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-[#008744] flex items-center justify-center mb-3">
                   <Award size={20} />
                 </div>
                 <h3 className="font-bold text-slate-900 text-base mb-2">Continuous Assessment</h3>
@@ -395,28 +395,29 @@ export const LandingPage: React.FC = () => {
            ======================================================== */}
         <section id="advising" className="py-16 bg-slate-100">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-[#0b1329] text-white rounded-3xl p-8 sm:p-12 text-center shadow-xl border border-slate-800">
-              <div className="w-14 h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center mx-auto mb-4 shadow-md">
+            <div className="bg-[#053321] text-white rounded-3xl p-8 sm:p-12 text-center shadow-xl border border-[#08452c] relative overflow-hidden">
+              <div className="absolute -top-24 -right-24 w-64 h-64 bg-[#00a651]/20 rounded-full blur-3xl pointer-events-none" />
+              <div className="w-14 h-14 rounded-2xl bg-[#00a651] text-white flex items-center justify-center mx-auto mb-4 shadow-md">
                 <GraduationCap size={28} />
               </div>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
                 Ready to access your academic dashboard?
               </h2>
-              <p className="mt-3 text-xs sm:text-sm text-slate-300 max-w-xl mx-auto leading-relaxed">
+              <p className="mt-3 text-xs sm:text-sm text-emerald-100/90 max-w-xl mx-auto leading-relaxed">
                 Log in with your institutional credentials to review your registered courses, view continuous attendance and marks, and check semester deadlines.
               </p>
               <div className="mt-6 flex flex-wrap justify-center gap-3">
                 <Link
                   to="/login"
-                  className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs sm:text-sm shadow-md transition-all cursor-pointer"
+                  className="px-6 py-3 rounded-xl bg-[#00a651] hover:bg-[#009247] text-white font-semibold text-xs sm:text-sm shadow-md transition-all cursor-pointer"
                 >
                   Sign In to Academic Portal
                 </Link>
                 <Link
-                  to="/register"
-                  className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-xs sm:text-sm transition-all cursor-pointer"
+                  to="/activate"
+                  className="px-6 py-3 rounded-xl bg-[#032517] hover:bg-[#053321] border border-[#08452c] text-emerald-100 font-semibold text-xs sm:text-sm transition-all cursor-pointer"
                 >
-                  New Student Registration
+                  Activate Student Account
                 </Link>
               </div>
             </div>
@@ -425,35 +426,35 @@ export const LandingPage: React.FC = () => {
       </main>
 
       {/* University Institutional Footer */}
-      <footer className="bg-[#080e22] text-white border-t border-slate-800 py-12 text-xs">
+      <footer className="bg-[#032517] text-white border-t border-[#08452c] py-12 text-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8 pb-8 border-b border-slate-800">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8 pb-8 border-b border-[#08452c]">
             <div className="space-y-3">
               <div className="flex items-center gap-2 font-bold text-sm text-white">
-                <GraduationCap size={20} className="text-blue-400" />
+                <GraduationCap size={20} className="text-[#00a651]" />
                 <span>University Academic Portal</span>
               </div>
-              <p className="text-slate-400 text-xs leading-relaxed">
+              <p className="text-emerald-200/80 text-xs leading-relaxed">
                 Centralized academic monitoring, attendance tracking, and advising intervention system.
               </p>
             </div>
 
             <div>
-              <div className="font-semibold text-slate-300 uppercase tracking-wider text-[11px] mb-3">
+              <div className="font-semibold text-emerald-200 uppercase tracking-wider text-[11px] mb-3">
                 Quick Access
               </div>
-              <ul className="space-y-2 text-slate-400 text-xs">
+              <ul className="space-y-2 text-emerald-100/80 text-xs">
                 <li><Link to="/login" className="hover:text-white transition-colors">Student Sign In</Link></li>
                 <li><Link to="/login" className="hover:text-white transition-colors">Faculty Portal</Link></li>
-                <li><Link to="/register" className="hover:text-white transition-colors">Account Activation</Link></li>
+                <li><Link to="/activate" className="hover:text-white transition-colors">Account Activation</Link></li>
               </ul>
             </div>
 
             <div>
-              <div className="font-semibold text-slate-300 uppercase tracking-wider text-[11px] mb-3">
+              <div className="font-semibold text-emerald-200 uppercase tracking-wider text-[11px] mb-3">
                 Campus Services
               </div>
-              <ul className="space-y-2 text-slate-400 text-xs">
+              <ul className="space-y-2 text-emerald-100/80 text-xs">
                 <li><a href="#" className="hover:text-white transition-colors">Academic Calendar</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Office of the Registrar</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Student Advising Center</a></li>
@@ -461,26 +462,26 @@ export const LandingPage: React.FC = () => {
             </div>
 
             <div>
-              <div className="font-semibold text-slate-300 uppercase tracking-wider text-[11px] mb-3">
+              <div className="font-semibold text-emerald-200 uppercase tracking-wider text-[11px] mb-3">
                 ICT Helpdesk
               </div>
-              <p className="text-slate-400 text-xs leading-relaxed mb-2">
+              <p className="text-emerald-200/80 text-xs leading-relaxed mb-2">
                 Experiencing technical difficulties? Contact the university computing center.
               </p>
-              <div className="text-blue-400 font-medium text-xs">
+              <div className="text-[#00a651] font-semibold text-xs">
                 helpdesk@university.edu
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-slate-500 text-[11px]">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-emerald-300/70 text-[11px]">
             <div>© 2026 University Academic Management System. All rights reserved.</div>
             <div className="flex items-center gap-4">
-              <a href="#" className="hover:text-slate-400 transition-colors">Privacy Policy</a>
+              <a href="#" className="hover:text-emerald-200 transition-colors">Privacy Policy</a>
               <span>•</span>
-              <a href="#" className="hover:text-slate-400 transition-colors">Terms of Use</a>
+              <a href="#" className="hover:text-emerald-200 transition-colors">Terms of Use</a>
               <span>•</span>
-              <a href="#" className="hover:text-slate-400 transition-colors">Security</a>
+              <a href="#" className="hover:text-emerald-200 transition-colors">Security</a>
             </div>
           </div>
         </div>
