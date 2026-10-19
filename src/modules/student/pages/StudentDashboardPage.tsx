@@ -407,7 +407,7 @@ export const StudentDashboardPage: React.FC = () => {
             ) : (
               <div className="divide-y divide-slate-100">
                 {enrollments.map((enr) => (
-                  <div key={enr.enrollmentId} className="py-3 px-2 -mx-2 rounded-lg hover:bg-slate-50/80 transition-colors flex items-center justify-between">
+                  <div key={enr.enrollmentId} className="py-3 px-2 -mx-2 rounded-lg hover:bg-slate-50/80 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-xs text-blue-700 bg-blue-50/90 px-2 py-0.5 rounded border border-blue-200">
@@ -420,7 +420,7 @@ export const StudentDashboardPage: React.FC = () => {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
                       <Link to={`/student/attendance`}>
                         <Button variant="outline" size="sm" className="text-[11px] h-7 px-2.5">
                           Attendance

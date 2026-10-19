@@ -116,9 +116,9 @@ export const CoursePerformanceBarChart: React.FC<CoursePerformanceBarChartProps>
                 {/* Course Header */}
                 <div className="flex items-center justify-between text-xs mb-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-900 font-mono">{c.courseCode}</span>
-                    <span className="text-slate-600 truncate max-w-[200px] sm:max-w-xs">{c.courseTitle}</span>
-                    <span className="text-[10px] text-slate-400 font-medium">{c.credits} Cr</span>
+                    <span className="font-bold text-slate-900 font-mono shrink-0">{c.courseCode}</span>
+                    <span className="text-slate-600 truncate max-w-[100px] sm:max-w-xs">{c.courseTitle}</span>
+                    <span className="text-[10px] text-slate-400 font-medium shrink-0">{c.credits} Cr</span>
                   </div>
 
                   <div className="flex items-center gap-2">
