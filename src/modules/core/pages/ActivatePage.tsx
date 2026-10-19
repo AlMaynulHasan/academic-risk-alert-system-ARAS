@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { School, KeyRound, CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, UserCheck } from 'lucide-react';
+import { School, KeyRound, CheckCircle2, AlertCircle, ShieldCheck, ArrowRight, ArrowLeft, UserCheck } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { academicRecordService } from '../../../shared/services/academicRecordService';
 import { StudentInvitation } from '../../../shared/types';
@@ -104,6 +104,23 @@ export const ActivatePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-10 sm:px-6 lg:px-8">
+      {/* Top Back Navigation Bar */}
+      <div className="sm:mx-auto sm:w-full sm:max-w-lg mb-3 px-4 sm:px-0 flex items-center justify-between">
+        <Link
+          to="/login"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 shadow-2xs transition-colors"
+        >
+          <ArrowLeft size={14} className="text-[#00a651]" />
+          <span>Back to Sign In</span>
+        </Link>
+        <Link
+          to="/"
+          className="text-xs text-slate-500 hover:text-[#008744] font-medium transition-colors"
+        >
+          Portal Home
+        </Link>
+      </div>
+
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <div className="w-12 h-12 rounded-lg bg-[#00a651] flex items-center justify-center text-white shadow-xs">
@@ -168,10 +185,14 @@ export const ActivatePage: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="pt-2 text-center text-xs text-slate-500">
-                    Already activated your account?{' '}
-                    <Link to="/login" className="font-medium text-[#008744] hover:text-[#006834]">
-                      Sign in here
+                  <div className="pt-3 border-t border-slate-100 text-center text-xs text-slate-500 flex items-center justify-center gap-3">
+                    <Link to="/login" className="inline-flex items-center gap-1 font-semibold text-[#008744] hover:text-[#006834]">
+                      <ArrowLeft size={13} />
+                      <span>Back to Sign In</span>
+                    </Link>
+                    <span>•</span>
+                    <Link to="/" className="text-slate-500 hover:text-slate-800">
+                      Portal Home
                     </Link>
                   </div>
                 </form>
@@ -261,6 +282,16 @@ export const ActivatePage: React.FC = () => {
                     <Button type="submit" className="w-2/3" isLoading={isSubmitting}>
                       Complete Activation
                     </Button>
+                  </div>
+
+                  <div className="text-center pt-2 border-t border-slate-100">
+                    <Link
+                      to="/login"
+                      className="text-xs text-slate-500 hover:text-slate-800 inline-flex items-center gap-1 font-medium transition-colors"
+                    >
+                      <ArrowLeft size={13} />
+                      <span>Cancel & Return to Sign In</span>
+                    </Link>
                   </div>
                 </form>
               )}
