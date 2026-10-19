@@ -31,6 +31,9 @@ export interface StudentProfile {
   level?: string; // Academic level, e.g., 'Level 3, Term 1'
   currentSemesterId: string;
   cgpa: number | null;
+  displayName?: string;
+  officialStudentId?: string;
+  section?: string;
   phone?: string;
   emergencyContact?: string;
   createdAt: string;

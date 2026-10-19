@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../../core/AuthContext';
 import { PageHeader } from '../../../shared/ui/PageHeader';
@@ -39,6 +39,8 @@ import { ProgressComparisonCard } from '../components/ProgressComparisonCard';
 import { FeedbackSection } from '../components/FeedbackSection';
 import { CreateAssessmentModal } from '../components/CreateAssessmentModal';
 import { CreateDeadlineModal } from '../components/CreateDeadlineModal';
+import { ExportReportModal } from '../../../shared/ui/ExportReportModal';
+import { AcademicReportData } from '../../../shared/services/exportReportService';
 import {
   ArrowLeft,
   AlertOctagon,
@@ -57,6 +59,7 @@ import {
   Edit2,
   CalendarCheck,
   TrendingUp,
+  Download,
 } from 'lucide-react';
 
 export const StudentDetailPage: React.FC = () => {
@@ -89,6 +92,7 @@ export const StudentDetailPage: React.FC = () => {
   const [isAssessmentModalOpen, setIsAssessmentModalOpen] = useState(false);
   const [editingAssessment, setEditingAssessment] = useState<Assessment | null>(null);
   const [isDeadlineModalOpen, setIsDeadlineModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [allCourses, setAllCourses] = useState<Course[]>([]);
   const [allSemesters, setAllSemesters] = useState<Semester[]>([]);
 
@@ -234,6 +238,108 @@ export const StudentDetailPage: React.FC = () => {
     }
   };
 
+  // Compile full Academic Report Data for PDF/CSV documentation export
+  const exportReportData: AcademicReportData = useMemo(() => {
+    const totalClasses = attendance?.totalClasses || 0;
+    const attended = attendance?.attendedClasses || 0;
+    const records = attendance?.records || [];
+    let absent = 0;
+    let late = 0;
+    let excused = 0;
+    records.forEach((r) => {
+      if (r.status === 'absent') absent++;
+      else if (r.status === 'late') late++;
+      else if (r.status === 'excused') excused++;
+    });
+
+    const totalCredits = enrollments.reduce((sum, c) => sum + c.credits, 0);
+
+    const markItems = marks?.items || [];
+    const courseBreakdown = enrollments.map((enr) => {
+      const cItems = markItems.filter((i) => i.assessment.courseId === enr.courseId);
+      let obtained = 0;
+      let max = 0;
+      let gradedCount = 0;
+      cItems.forEach((i) => {
+        if (i.mark && i.mark.obtainedMarks !== null && i.mark.obtainedMarks !== undefined) {
+          obtained += i.mark.obtainedMarks;
+          max += i.assessment.maxMarks;
+          gradedCount++;
+        }
+      });
+      const pct = gradedCount > 0 && max > 0 ? Math.round(((obtained / max) * 100) * 10) / 10 : null;
+      return {
+        courseCode: enr.courseCode,
+        courseTitle: enr.courseTitle,
+        credits: enr.credits,
+        percentage: pct,
+        gradedCount,
+        totalAssessments: cItems.length,
+      };
+    });
+
+    const asmtRows = markItems.map((item) => {
+      const course = enrollments.find((e) => e.courseId === item.assessment.courseId);
+      const obtained = item.mark ? item.mark.obtainedMarks : null;
+      const pct =
+        obtained !== null && item.assessment.maxMarks > 0
+          ? Math.round(((obtained / item.assessment.maxMarks) * 100) * 10) / 10
+          : null;
+      return {
+        courseCode: course ? course.courseCode : undefined,
+        title: item.assessment.title,
+        type: item.assessment.type,
+        dueDate: item.assessment.dueDate,
+        maxMarks: item.assessment.maxMarks,
+        obtainedMarks: obtained,
+        percentage: pct,
+      };
+    });
+
+    return {
+      student: {
+        id: studentId,
+        officialStudentId: profile?.studentId || studentId,
+        displayName: profile?.displayName || studentUser?.displayName || 'Student Profile',
+        email: studentUser?.email || '',
+        department: profile?.department || 'Computer Science & Engineering',
+        batch: profile?.batch,
+        section: profile?.section,
+        level: profile?.level,
+        advisorName: user?.displayName || 'Assigned Advisor',
+      },
+      semester: 'Spring 2026',
+      generatedAt: new Date().toISOString(),
+      kpis: {
+        attendancePercentage: attendance?.percentage ?? 100,
+        totalClasses,
+        attendedClasses: attended,
+        absentClasses: absent,
+        lateClasses: late,
+        excusedClasses: excused,
+        marksAverage: marks?.percentage ?? null,
+        missingAssessmentsCount: currentRisk?.missingAssignmentsCount ?? marks?.missingCount ?? 0,
+        enrolledCoursesCount: enrollments.length,
+        totalCredits,
+      },
+      riskStatus: currentRisk
+        ? {
+            level: currentRisk.riskLevel,
+            score: currentRisk.score,
+            reasons: currentRisk.reasons || [],
+            isSufficientData: currentRisk.isSufficientData,
+          }
+        : null,
+      courses: courseBreakdown,
+      assessments: asmtRows,
+      attendanceRecords: records.map((att) => ({
+        date: att.date,
+        courseCode: enrollments.find((e) => e.courseId === att.courseId)?.courseCode,
+        status: att.status,
+      })),
+    };
+  }, [studentId, profile, studentUser, attendance, marks, enrollments, currentRisk, user]);
+
   if (loading) {
     return (
       <div className="py-24 text-center text-xs text-slate-500 animate-pulse">
@@ -285,7 +391,16 @@ export const StudentDetailPage: React.FC = () => {
           { label: profile?.studentId || studentId },
         ]}
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsExportModalOpen(true)}
+              className="gap-1.5 text-xs bg-white shadow-2xs border-slate-300 hover:border-slate-400"
+            >
+              <Download size={14} className="text-blue-600" />
+              <span>Export Report</span>
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -1022,6 +1137,13 @@ export const StudentDetailPage: React.FC = () => {
           }}
         />
       )}
+
+      {/* Export Academic Report Modal */}
+      <ExportReportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        reportData={exportReportData}
+      />
     </div>
   );
 };

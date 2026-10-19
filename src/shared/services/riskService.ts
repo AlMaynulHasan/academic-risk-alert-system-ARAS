@@ -33,6 +33,12 @@ export interface CurrentRiskStatus {
   attendanceRate: number;
   marksAverage: number | null;
   missingAssignmentsCount: number;
+  componentScores?: {
+    attendance: number | null;
+    marks: number | null;
+    completion: number | null;
+    trend: number | null;
+  };
   computedAt: string;
   configVersion: string;
 }
@@ -169,6 +175,7 @@ export class RiskService implements IRiskService {
         isSufficientData: result.isSufficientData,
         reasons: result.reasons,
         structuredReasons: result.structuredReasons,
+        componentScores: result.componentScores,
         attendanceRate: result.metrics.attendancePercentage,
         marksAverage: result.metrics.marksAverage,
         missingAssignmentsCount: result.metrics.missingAssignmentsCount,
@@ -232,6 +239,7 @@ export class RiskService implements IRiskService {
         isSufficientData: latest.isSufficientData ?? true,
         reasons: latest.reasons || [],
         structuredReasons: latest.structuredReasons || [],
+        componentScores: latest.componentScores || undefined,
         attendanceRate: latest.attendancePercentage || 0,
         marksAverage: latest.marksAverage ?? null,
         missingAssignmentsCount: latest.missingAssignmentsCount || 0,
