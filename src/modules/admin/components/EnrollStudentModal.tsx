@@ -16,6 +16,7 @@ interface EnrollStudentModalProps {
   courses: Course[];
   semesters: Semester[];
   onSaved: () => void;
+  defaultStudentId?: string;
 }
 
 export const EnrollStudentModal: React.FC<EnrollStudentModalProps> = ({
@@ -25,17 +26,39 @@ export const EnrollStudentModal: React.FC<EnrollStudentModalProps> = ({
   courses,
   semesters,
   onSaved,
+  defaultStudentId,
 }) => {
   const { user } = useAuth();
   const { showToast } = useToast();
 
-  const [studentId, setStudentId] = useState(students[0]?.id || '');
+  const [studentId, setStudentId] = useState(defaultStudentId || students[0]?.id || '');
   const [courseId, setCourseId] = useState(courses[0]?.id || '');
   const [semesterId, setSemesterId] = useState(
     semesters.find((s) => s.isCurrent)?.id || semesters[0]?.id || ''
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync state whenever modal opens or props change
+  React.useEffect(() => {
+    if (isOpen) {
+      setError(null);
+      if (defaultStudentId && students.some((s) => s.id === defaultStudentId)) {
+        setStudentId(defaultStudentId);
+      } else if (!studentId || !students.some((s) => s.id === studentId)) {
+        if (students.length > 0) {
+          setStudentId(students[0].id);
+        }
+      }
+      if (!courseId && courses.length > 0) {
+        setCourseId(courses[0].id);
+      }
+      const cur = semesters.find((s) => s.isCurrent) || semesters[0];
+      if (cur && (!semesterId || !semesters.some((s) => s.id === semesterId))) {
+        setSemesterId(cur.id);
+      }
+    }
+  }, [isOpen, defaultStudentId, students, courses, semesters]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

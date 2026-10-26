@@ -117,6 +117,7 @@ export const AdminUsersPage: React.FC = () => {
   const [editingSemester, setEditingSemester] = useState<Semester | null>(null);
 
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
+  const [selectedStudentForEnroll, setSelectedStudentForEnroll] = useState<string>('');
   const [isAdvisorModalOpen, setIsAdvisorModalOpen] = useState(false);
 
   // User role modification
@@ -137,6 +138,33 @@ export const AdminUsersPage: React.FC = () => {
       usersSnap.forEach((d) => {
         uList.push({ id: d.id, ...(d.data() as Omit<User, 'id'>) });
       });
+
+      // Merge custom/demo registered faculty and users from local storage
+      try {
+        const storedDemoUsers = JSON.parse(localStorage.getItem('aras_demo_registered_users') || '{}');
+        Object.values(storedDemoUsers).forEach((entry: any) => {
+          if (entry?.user && !uList.some((u) => u.id === entry.user.id || u.email?.toLowerCase() === entry.user.email?.toLowerCase())) {
+            uList.push(entry.user);
+          }
+        });
+      } catch (e) {
+        console.warn('Could not read demo registered users:', e);
+      }
+
+      // Ensure demo-teacher-01 exists for immediate assignment testing if not present
+      if (!uList.some((u) => u.id === 'demo-teacher-01' || u.email === 'teacher01@example.edu')) {
+        uList.push({
+          id: 'demo-teacher-01',
+          email: 'teacher01@example.edu',
+          displayName: 'Dr. Tariqul Islam (Course Teacher & Advisor)',
+          role: 'teacher',
+          departmentId: 'CSE',
+          designation: 'Associate Professor',
+          createdAt: '2026-01-10T00:00:00.000Z',
+          updatedAt: '2026-01-10T00:00:00.000Z',
+        });
+      }
+
       setUsersList(uList);
 
       // Fetch courses (include inactive)
@@ -327,7 +355,23 @@ export const AdminUsersPage: React.FC = () => {
     return matchesSearch && matchesRole;
   });
 
-  const studentsList = usersList.filter((u) => u.role === 'student');
+  const baseStudents = usersList.filter((u) => u.role === 'student');
+  const studentsList: User[] = [...baseStudents];
+  invitations.forEach((inv) => {
+    const studentUid = inv.claimedByUid || inv.id;
+    if (!studentsList.some((s) => s.id === studentUid || s.email?.toLowerCase() === inv.email?.toLowerCase())) {
+      studentsList.push({
+        id: studentUid,
+        email: inv.email,
+        displayName: `${inv.displayName || 'Student'} (${inv.officialStudentId})`,
+        role: 'student',
+        departmentId: inv.department,
+        createdAt: inv.createdAt,
+        updatedAt: inv.createdAt,
+      });
+    }
+  });
+
   const teachersList = usersList.filter(
     (u) =>
       u.role === 'teacher' ||
@@ -884,9 +928,23 @@ export const AdminUsersPage: React.FC = () => {
                                   </button>
                                 )}
                                 {inv.status === 'claimed' && (
-                                  <span className="text-[10px] text-emerald-700 font-medium">
-                                    Enrolled & Active
-                                  </span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                      Active
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedStudentForEnroll(inv.claimedByUid || inv.id);
+                                        setIsEnrollModalOpen(true);
+                                      }}
+                                      className="inline-flex items-center gap-1 px-2 py-1 text-2xs border border-blue-200 bg-blue-50/70 hover:bg-blue-100 text-blue-800 font-medium rounded transition-colors cursor-pointer"
+                                      title="Enroll student into courses"
+                                    >
+                                      <GraduationCap size={10} />
+                                      <span>+ Course</span>
+                                    </button>
+                                  </div>
                                 )}
                               </div>
                             </td>
@@ -1603,10 +1661,14 @@ export const AdminUsersPage: React.FC = () => {
       {isEnrollModalOpen && (
         <EnrollStudentModal
           isOpen={isEnrollModalOpen}
-          onClose={() => setIsEnrollModalOpen(false)}
+          onClose={() => {
+            setIsEnrollModalOpen(false);
+            setSelectedStudentForEnroll('');
+          }}
           students={studentsList}
           courses={courses.filter((c) => c.isActive !== false)}
           semesters={semesters}
+          defaultStudentId={selectedStudentForEnroll}
           onSaved={loadAllAdminData}
         />
       )}

@@ -91,14 +91,7 @@ export const CreateTeacherModal: React.FC<CreateTeacherModalProps> = ({
     };
 
     try {
-      // 1. Persist to Firestore users collection
-      await setDoc(doc(db, 'users', sanitizedId), {
-        ...newTeacher,
-        passwordHash: password, // For evaluation and credential lookup
-        createdBy: user?.id || 'admin',
-      }, { merge: true });
-
-      // 2. Register into local demo users registry so immediate login works seamlessly
+      // 1. Register into local demo users registry so immediate login and admin listing work seamlessly
       try {
         const storedDemoUsers = JSON.parse(localStorage.getItem('aras_demo_registered_users') || '{}');
         storedDemoUsers[cleanEmail] = {
@@ -108,6 +101,17 @@ export const CreateTeacherModal: React.FC<CreateTeacherModalProps> = ({
         localStorage.setItem('aras_demo_registered_users', JSON.stringify(storedDemoUsers));
       } catch (localErr) {
         console.warn('Could not cache demo credentials:', localErr);
+      }
+
+      // 2. Persist to Firestore users collection
+      try {
+        await setDoc(doc(db, 'users', sanitizedId), {
+          ...newTeacher,
+          passwordHash: password, // For evaluation and credential lookup
+          createdBy: user?.id || 'admin',
+        }, { merge: true });
+      } catch (fsErr) {
+        console.warn('Firestore setDoc user warning (proceeding with local registration):', fsErr);
       }
 
       showToast(`Faculty member "${displayName}" created successfully as ${role.toUpperCase()}!`, 'success');

@@ -3,7 +3,7 @@ import { Modal } from '../../../shared/ui/Modal';
 import { Button } from '../../../shared/ui/Button';
 import { FormField } from '../../../shared/ui/FormField';
 import { CourseOffering, User } from '../../../shared/types';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../../shared/firebase';
 import { useAuth } from '../../core/AuthContext';
 import { useToast } from '../../../shared/ui/Toast';
@@ -53,11 +53,16 @@ export const AssignCourseTeacherModal: React.FC<AssignCourseTeacherModalProps> =
 
     try {
       const teacherIds = selectedTeacherId ? [selectedTeacherId] : [];
-      await updateDoc(doc(db, 'courseOfferings', offering.id), {
-        teacherIds,
-        updatedAt: now,
-        updatedBy: user?.id || 'admin',
-      });
+      await setDoc(
+        doc(db, 'courseOfferings', offering.id),
+        {
+          ...offering,
+          teacherIds,
+          updatedAt: now,
+          updatedBy: user?.id || 'admin',
+        },
+        { merge: true }
+      );
 
       const assignedTeacher = teachers.find((t) => t.id === selectedTeacherId);
       showToast(

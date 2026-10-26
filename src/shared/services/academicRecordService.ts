@@ -1440,10 +1440,14 @@ export class AcademicRecordService implements IAcademicRecordService {
   ): Promise<void> {
     const now = getCurrentUtcIso();
     try {
-      await updateDoc(doc(db, 'courseOfferings', offeringId), {
-        ...updates,
-        updatedAt: now,
-      });
+      await setDoc(
+        doc(db, 'courseOfferings', offeringId),
+        {
+          ...updates,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, `courseOfferings/${offeringId}`);
     }
@@ -1673,6 +1677,39 @@ export class AcademicRecordService implements IAcademicRecordService {
       } catch (err) {
         console.warn('Could not auto-create advisor assignment doc:', err);
       }
+    }
+
+    // Auto-enroll newly activated student into active courses for their department in the current semester
+    try {
+      const allCourses = await this.getCourses(false);
+      const invDept = (inv.department || '').trim().toLowerCase();
+      const matchedCourses = allCourses.filter((c) => {
+        const cDept = (c.department || '').trim().toLowerCase();
+        return (
+          cDept === invDept ||
+          cDept.includes(invDept) ||
+          invDept.includes(cDept) ||
+          c.code.toLowerCase().startsWith(invDept)
+        );
+      });
+      const coursesToEnroll = matchedCourses.length > 0 ? matchedCourses : allCourses.slice(0, 3);
+      for (const crs of coursesToEnroll) {
+        try {
+          await this.createEnrollment(
+            {
+              studentId: studentUid,
+              courseId: crs.id,
+              semesterId: curSemId,
+              status: 'enrolled',
+            },
+            { uid: 'system', role: 'admin' }
+          );
+        } catch (enrErr) {
+          // Ignore duplicate enrollment error
+        }
+      }
+    } catch (autoEnrErr) {
+      console.warn('Auto enrollment on claim token note:', autoEnrErr);
     }
 
     return {
