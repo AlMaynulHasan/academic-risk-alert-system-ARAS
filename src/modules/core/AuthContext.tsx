@@ -258,9 +258,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const customUsers = JSON.parse(localStorage.getItem('aras_demo_registered_users') || '{}');
           if (customUsers[storedDemoEmail]) {
-            const cUser = customUsers[storedDemoEmail].user;
-            setUser(cUser);
-            setRole(cUser.role);
+            const entry = customUsers[storedDemoEmail];
+            setUser(entry.user);
+            setRole(entry.user.role);
+            if (entry.profile) {
+              setProfile(entry.profile);
+            }
             setIsDemoSession(true);
           }
         } catch {
@@ -305,6 +308,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (registered.password === pass || !registered.password) {
             setUser(registered.user);
             setRole(registered.user.role);
+            if (registered.profile) {
+              setProfile(registered.profile);
+            }
             setIsDemoSession(true);
             localStorage.setItem('aras_demo_session_email', cleanEmail);
             return registered.user.role;

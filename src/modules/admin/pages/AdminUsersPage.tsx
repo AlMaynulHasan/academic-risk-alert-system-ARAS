@@ -596,14 +596,24 @@ export const AdminUsersPage: React.FC = () => {
             title="User Account Directory & Role-Based Access Control"
             subtitle="Manage university faculty, advisors, administrators, and students. Admins can create new teachers and assign roles."
             action={
-              <Button
-                size="sm"
-                onClick={() => setIsTeacherModalOpen(true)}
-                className="gap-1.5 text-xs h-8 bg-[#00a651] hover:bg-[#009247] text-white font-semibold"
-              >
-                <UserPlus size={14} />
-                <span>Add Faculty / Teacher</span>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => setIsInvitationModalOpen(true)}
+                  className="gap-1.5 text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                >
+                  <UserPlus size={14} />
+                  <span>Add Student</span>
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setIsTeacherModalOpen(true)}
+                  className="gap-1.5 text-xs h-8 bg-[#00a651] hover:bg-[#009247] text-white font-semibold"
+                >
+                  <UserPlus size={14} />
+                  <span>Add Faculty / Teacher</span>
+                </Button>
+              </div>
             }
           />
           <CardContent className="space-y-4">

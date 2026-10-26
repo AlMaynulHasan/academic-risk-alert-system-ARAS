@@ -1499,11 +1499,39 @@ export class AcademicRecordService implements IAcademicRecordService {
     const cleanStudentId = invitation.officialStudentId.trim();
     const cleanEmail = invitation.email.trim().toLowerCase();
 
-    // Check if duplicate studentId is already pending
+    // Check if an invitation with this studentId or email already exists
     const existing = await this.getStudentInvitations('pending');
-    const dup = existing.find((i) => i.officialStudentId.toUpperCase() === cleanStudentId.toUpperCase());
+    const dup = existing.find(
+      (i) => i.officialStudentId.toUpperCase() === cleanStudentId.toUpperCase() || i.email.toLowerCase() === cleanEmail
+    );
     if (dup) {
-      throw new Error(`VALIDATION_ERROR: An active pending invitation already exists for student ID "${cleanStudentId}".`);
+      // Refresh token and update metadata rather than failing with an error
+      const randPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const timePart = Date.now().toString(36).toUpperCase();
+      dup.token = `ACT-${randPart}-${timePart}`;
+      dup.displayName = invitation.displayName?.trim() || dup.displayName;
+      dup.department = invitation.department.trim();
+      dup.batch = invitation.batch?.trim() || dup.batch;
+      dup.section = invitation.section?.trim() || dup.section;
+      dup.level = invitation.level?.trim() || dup.level;
+      dup.advisorId = invitation.advisorId || dup.advisorId;
+      dup.expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      dup.updatedAt = getCurrentUtcIso();
+
+      try {
+        await setDoc(doc(db, 'studentInvitations', dup.id), dup, { merge: true });
+      } catch (fsErr) {
+        console.warn('Could not update Firestore invitation:', fsErr);
+      }
+      try {
+        const stored: StudentInvitation[] = JSON.parse(localStorage.getItem('aras_demo_invitations') || '[]');
+        const idx = stored.findIndex((s) => s.id === dup.id || s.officialStudentId.toUpperCase() === cleanStudentId.toUpperCase());
+        if (idx !== -1) stored[idx] = dup;
+        else stored.unshift(dup);
+        localStorage.setItem('aras_demo_invitations', JSON.stringify(stored));
+      } catch (e) {}
+
+      return dup;
     }
 
     const randPart = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -1531,27 +1559,22 @@ export class AcademicRecordService implements IAcademicRecordService {
       createdBy: actor?.uid || invitation.createdBy || 'admin',
     };
 
-    const isDemo = Boolean(localStorage.getItem('aras_demo_session_email')) || !auth.currentUser;
-
-    if (!isDemo && auth.currentUser) {
-      try {
-        await setDoc(doc(db, 'studentInvitations', docId), payload);
-        return payload;
-      } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `studentInvitations/${docId}`);
-        return payload;
-      }
-    } else {
-      // In preview demo mode or unauthenticated fallback, save to demo storage
-      try {
-        const stored: StudentInvitation[] = JSON.parse(localStorage.getItem('aras_demo_invitations') || '[]');
-        stored.unshift(payload);
-        localStorage.setItem('aras_demo_invitations', JSON.stringify(stored));
-      } catch (e) {
-        console.warn('Could not store demo invitation:', e);
-      }
-      return payload;
+    // Always store to local demo storage so invitations are immediately visible
+    try {
+      const stored: StudentInvitation[] = JSON.parse(localStorage.getItem('aras_demo_invitations') || '[]');
+      stored.unshift(payload);
+      localStorage.setItem('aras_demo_invitations', JSON.stringify(stored));
+    } catch (e) {
+      console.warn('Could not store demo invitation:', e);
     }
+
+    try {
+      await setDoc(doc(db, 'studentInvitations', docId), payload);
+    } catch (err) {
+      console.warn('Firestore setDoc studentInvitations warning:', err);
+    }
+
+    return payload;
   }
 
   async verifyInvitationToken(token: string): Promise<StudentInvitation> {

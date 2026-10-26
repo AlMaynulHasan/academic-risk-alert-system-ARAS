@@ -5,9 +5,27 @@ import { FormField } from '../../../shared/ui/FormField';
 import { Input, Select } from '../../../shared/ui/Input';
 import { StudentInvitation, Department, User } from '../../../shared/types';
 import { academicRecordService } from '../../../shared/services/academicRecordService';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../../../shared/firebase';
 import { useAuth } from '../../core/AuthContext';
 import { useToast } from '../../../shared/ui/Toast';
-import { AlertCircle, UserPlus, Copy, Check, CheckCircle2, ShieldCheck, UserCheck, FileText } from 'lucide-react';
+import { getCurrentUtcIso } from '../../../shared/utils/date';
+import {
+  AlertCircle,
+  UserPlus,
+  Copy,
+  Check,
+  CheckCircle2,
+  ShieldCheck,
+  UserCheck,
+  FileText,
+  Key,
+  RefreshCw,
+  Eye,
+  EyeOff,
+  Sparkles,
+  Lock,
+} from 'lucide-react';
 import { ACADEMIC_LEVELS } from '../../../shared/constants';
 
 interface CreateInvitationModalProps {
@@ -38,14 +56,32 @@ export const CreateInvitationModal: React.FC<CreateInvitationModalProps> = ({
   const [phone, setPhone] = useState('');
   const [advisorId, setAdvisorId] = useState('');
 
+  // Immediate Activation & Password
+  const [instantActivate, setInstantActivate] = useState(true);
+  const [password, setPassword] = useState('StudentPass2026!');
+  const [showPassword, setShowPassword] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Result state
   const [createdInvitation, setCreatedInvitation] = useState<StudentInvitation | null>(null);
+  const [wasInstantActivated, setWasInstantActivated] = useState(false);
+  const [savedPassword, setSavedPassword] = useState('');
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedSlip, setCopiedSlip] = useState(false);
+  const [copiedCredentials, setCopiedCredentials] = useState(false);
+
+  const generateRandomPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+    let res = '';
+    for (let i = 0; i < 12; i++) {
+      res += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setPassword(res);
+    setShowPassword(true);
+  };
 
   const handleReset = () => {
     setDisplayName('');
@@ -53,10 +89,14 @@ export const CreateInvitationModal: React.FC<CreateInvitationModalProps> = ({
     setEmail('');
     setPhone('');
     setAdvisorId('');
+    setPassword('StudentPass2026!');
     setCreatedInvitation(null);
+    setWasInstantActivated(false);
+    setSavedPassword('');
     setCopiedCode(false);
     setCopiedLink(false);
     setCopiedSlip(false);
+    setCopiedCredentials(false);
     setError(null);
   };
 
@@ -85,14 +125,24 @@ export const CreateInvitationModal: React.FC<CreateInvitationModalProps> = ({
       return;
     }
 
+    if (instantActivate && (!password || password.length < 6)) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+
     setIsSubmitting(true);
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanStudentId = studentId.trim().toUpperCase();
+    const sanitizedUid = `student_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`;
+    const now = getCurrentUtcIso();
 
     try {
-      const inv = await academicRecordService.createStudentInvitation(
+      // 1. Create student invitation record
+      let inv = await academicRecordService.createStudentInvitation(
         {
-          officialStudentId: studentId.trim().toUpperCase(),
+          officialStudentId: cleanStudentId,
           displayName: displayName.trim(),
-          email: email.trim().toLowerCase(),
+          email: cleanEmail,
           department,
           batch: batch.trim(),
           section: section.trim().toUpperCase(),
@@ -104,13 +154,67 @@ export const CreateInvitationModal: React.FC<CreateInvitationModalProps> = ({
         { uid: user?.id || 'admin', role: user?.role || 'admin' }
       );
 
+      if (instantActivate) {
+        // 2. Claim token immediately & auto-enroll
+        const claimResult = await academicRecordService.claimInvitationToken(
+          inv.token,
+          sanitizedUid,
+          cleanStudentId
+        );
+        inv = claimResult.invitation;
+
+        // 3. Create active Student User doc
+        const newStudentUser: User = {
+          id: sanitizedUid,
+          email: cleanEmail,
+          displayName: displayName.trim(),
+          role: 'student',
+          departmentId: department,
+          assignedDepartment: department,
+          phone: phone.trim() || undefined,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        // Cache in local storage for instant login
+        try {
+          const storedDemoUsers = JSON.parse(localStorage.getItem('aras_demo_registered_users') || '{}');
+          storedDemoUsers[cleanEmail] = {
+            user: newStudentUser,
+            password: password,
+            profile: claimResult.profile,
+          };
+          localStorage.setItem('aras_demo_registered_users', JSON.stringify(storedDemoUsers));
+        } catch (localErr) {
+          console.warn('Could not cache student demo credentials:', localErr);
+        }
+
+        // Persist to Firestore
+        try {
+          await setDoc(doc(db, 'users', sanitizedUid), {
+            ...newStudentUser,
+            passwordHash: password,
+            createdBy: user?.id || 'admin',
+          }, { merge: true });
+        } catch (fsErr) {
+          console.warn('Firestore setDoc student note:', fsErr);
+        }
+
+        setWasInstantActivated(true);
+        setSavedPassword(password);
+        showToast(`Student "${displayName}" registered, activated, and enrolled in courses!`, 'success');
+      } else {
+        setWasInstantActivated(false);
+        showToast('Student registered successfully! Activation code generated.', 'success');
+      }
+
       setCreatedInvitation(inv);
-      showToast('Student registered successfully! Activation code generated.', 'success');
       onCreated(inv);
     } catch (err: unknown) {
       console.error('Create student registration error:', err);
       const msg = err instanceof Error ? err.message : 'Failed to register student.';
       setError(msg);
+      showToast(msg, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -133,6 +237,15 @@ export const CreateInvitationModal: React.FC<CreateInvitationModalProps> = ({
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
+  const copyCredentials = () => {
+    if (!createdInvitation) return;
+    const creds = `Email: ${createdInvitation.email}\nPassword: ${savedPassword}\nStudent ID: ${createdInvitation.officialStudentId}`;
+    navigator.clipboard.writeText(creds);
+    setCopiedCredentials(true);
+    showToast('Login credentials copied to clipboard!', 'success');
+    setTimeout(() => setCopiedCredentials(false), 2500);
+  };
+
   const copyFullSlip = () => {
     if (!createdInvitation) return;
     const advisorName = advisors.find((a) => a.id === createdInvitation.advisorId)?.displayName || 'Unassigned';
@@ -147,13 +260,14 @@ Batch & Section:  Batch ${createdInvitation.batch} (Sec ${createdInvitation.sect
 Academic Level:   ${createdInvitation.level || 'Level 1, Term 1'}
 Academic Advisor: ${advisorName}
 
-ACTIVATION CODE:  ${createdInvitation.token}
-ACTIVATION LINK:  ${window.location.origin}/activate?token=${createdInvitation.token}
+${wasInstantActivated ? `ACCOUNT STATUS:   ACTIVE & READY TO LOGIN
+LOGIN PASSWORD:   ${savedPassword}
+LOGIN URL:        ${window.location.origin}/login` : `ACTIVATION CODE:  ${createdInvitation.token}
+ACTIVATION LINK:  ${window.location.origin}/activate?token=${createdInvitation.token}`}
 
 INSTRUCTIONS:
-1. Open the Activation Link above.
-2. Confirm your Student ID and set your account password.
-3. Once completed, your student dashboard and courses will be accessible.
+1. Log in at the student portal with your institutional email and password.
+2. View enrolled courses, daily attendance rate, and continuous assessment marks.
 ===========================================`;
 
     navigator.clipboard.writeText(slipText);
@@ -166,11 +280,11 @@ INSTRUCTIONS:
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={createdInvitation ? 'Student Registered & Activation Code Issued' : 'Register New Student (Institutional Form)'}
+      title={createdInvitation ? (wasInstantActivated ? 'Student Enrolled & Activated Successfully' : 'Student Registered & Code Issued') : 'Register New Student (Institutional Form)'}
       description={
         createdInvitation
-          ? 'The student has been officially registered in the university system. Share the activation credentials below.'
-          : 'Complete the institutional student enrollment form. An official one-time activation token will be generated for password setup.'
+          ? 'The student has been officially registered in the university system and courses have been linked.'
+          : 'Complete the institutional student enrollment form with auto-course enrollment and optional instant activation.'
       }
       maxWidth="lg"
     >
@@ -180,7 +294,7 @@ INSTRUCTIONS:
           <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-3">
             <div className="flex items-center gap-2 text-xs font-bold text-[#006834]">
               <CheckCircle2 size={18} className="text-[#00a651]" />
-              <span>Student Registration Complete & Enrolled</span>
+              <span>{wasInstantActivated ? 'Student Account Active & Ready to Login' : 'Registration Complete & Activation Token Issued'}</span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs text-slate-700 bg-white/80 p-3 rounded-lg border border-emerald-100">
@@ -214,40 +328,74 @@ INSTRUCTIONS:
               </div>
             </div>
 
-            {/* Activation Code Highlight */}
-            <div className="space-y-1.5 pt-1">
-              <span className="text-2xs font-bold uppercase tracking-wider text-emerald-900">
-                Official Student Activation Code:
-              </span>
-              <div className="p-3 bg-white border-2 border-emerald-500 rounded-lg flex items-center justify-between gap-2 shadow-2xs">
-                <span className="font-mono text-base font-extrabold text-[#006834] tracking-wide select-all">
-                  {createdInvitation.token}
-                </span>
-                <div className="flex items-center gap-1.5">
+            {/* Instant Login Credentials Strip */}
+            {wasInstantActivated && savedPassword && (
+              <div className="p-3 bg-white border-2 border-emerald-500 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <Key size={14} className="text-[#00a651]" />
+                    <span>Instant Login Credentials</span>
+                  </span>
                   <button
                     type="button"
-                    onClick={copyCodeOnly}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-[#006834] rounded text-xs font-semibold transition-colors cursor-pointer"
+                    onClick={copyCredentials}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-[#006834] rounded text-xs font-semibold cursor-pointer"
                   >
-                    {copiedCode ? <Check size={13} className="text-emerald-700" /> : <Copy size={13} />}
-                    <span>{copiedCode ? 'Copied' : 'Copy Code'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={copyActivationLink}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-medium transition-colors cursor-pointer"
-                  >
-                    {copiedLink ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
-                    <span>{copiedLink ? 'Link Copied' : 'Copy Direct Link'}</span>
+                    {copiedCredentials ? <Check size={12} /> : <Copy size={12} />}
+                    <span>{copiedCredentials ? 'Copied' : 'Copy Credentials'}</span>
                   </button>
                 </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                  <div>
+                    <span className="text-slate-400 text-2xs block font-sans">Login Email:</span>
+                    <span className="font-semibold text-slate-900">{createdInvitation.email}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-2xs block font-sans">Password:</span>
+                    <span className="font-semibold text-[#006834]">{savedPassword}</span>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Activation Code Highlight */}
+            {!wasInstantActivated && (
+              <div className="space-y-1.5 pt-1">
+                <span className="text-2xs font-bold uppercase tracking-wider text-emerald-900">
+                  Official Student Activation Code:
+                </span>
+                <div className="p-3 bg-white border-2 border-emerald-500 rounded-lg flex items-center justify-between gap-2 shadow-2xs">
+                  <span className="font-mono text-base font-extrabold text-[#006834] tracking-wide select-all">
+                    {createdInvitation.token}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={copyCodeOnly}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-[#006834] rounded text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      {copiedCode ? <Check size={13} className="text-emerald-700" /> : <Copy size={13} />}
+                      <span>{copiedCode ? 'Copied' : 'Copy Code'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={copyActivationLink}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-medium transition-colors cursor-pointer"
+                    >
+                      {copiedLink ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                      <span>{copiedLink ? 'Link Copied' : 'Copy Direct Link'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="p-2.5 bg-emerald-100/60 rounded-md text-[11px] text-[#006834] flex items-start gap-2">
               <ShieldCheck size={15} className="shrink-0 mt-0.5" />
               <span>
-                Provide this activation code to the student. They will visit the <strong>Student Activation</strong> page, verify their ID, and set their password to complete registration.
+                {wasInstantActivated
+                  ? 'Courses for the current semester have been automatically enrolled. The student can log in directly at the Student Portal!'
+                  : 'Provide this activation code to the student. They will visit the Student Activation page, verify their ID, and set their password to complete registration.'}
               </span>
             </div>
           </div>
@@ -310,7 +458,7 @@ INSTRUCTIONS:
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormField label="Official / Institutional Email" required hint="Used for activation & notices">
+            <FormField label="Official / Institutional Email" required hint="Used for student login & notices">
               <Input
                 type="email"
                 value={email}
@@ -346,6 +494,8 @@ INSTRUCTIONS:
                     <option value="CSE">CSE - Computer Science & Engineering</option>
                     <option value="EEE">EEE - Electrical & Electronic Engineering</option>
                     <option value="ME">ME - Mechanical Engineering</option>
+                    <option value="CE">CE - Civil Engineering</option>
+                    <option value="BBA">BBA - Business Administration</option>
                   </>
                 )}
               </Select>
@@ -387,7 +537,7 @@ INSTRUCTIONS:
               />
             </FormField>
 
-            <FormField label="Academic Advisor" hint="Optional initial advisor">
+            <FormField label="Academic Advisor" hint="Optional advisor">
               <Select
                 value={advisorId}
                 onChange={(e) => setAdvisorId(e.target.value)}
@@ -402,11 +552,60 @@ INSTRUCTIONS:
             </FormField>
           </div>
 
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 flex items-start gap-2">
-            <UserCheck size={16} className="shrink-0 mt-0.5 text-[#00a651]" />
-            <span>
-              <strong>Registration Policy:</strong> Submitting this form creates the student's official university record and issues a one-time activation token. The student will just set their password at <code>/activate</code> to complete account onboarding.
-            </span>
+          {/* Instant Activation with Password Checkbox & Field */}
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={instantActivate}
+                onChange={(e) => setInstantActivate(e.target.checked)}
+                className="h-4 w-4 rounded text-[#00a651] focus:ring-[#00a651]"
+              />
+              <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                <Sparkles size={14} className="text-[#00a651]" />
+                <span>Activate Immediately with Initial Password (Recommended)</span>
+              </span>
+            </label>
+
+            {instantActivate && (
+              <div className="space-y-2 pt-1 border-t border-slate-200/80">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
+                    <Key size={13} className="text-[#00a651]" />
+                    <span>Student Initial Password</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={generateRandomPassword}
+                    className="text-[11px] text-[#008744] hover:text-[#006834] font-medium flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw size={11} />
+                    <span>Generate Secure Key</span>
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter minimum 6 characters password"
+                    className="pr-10 font-mono text-xs"
+                    required={instantActivate}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500">
+                  Direct activation creates the student account immediately and auto-enrolls them in their department's term courses.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
@@ -415,7 +614,7 @@ INSTRUCTIONS:
             </Button>
             <Button type="submit" isLoading={isSubmitting} className="gap-1.5">
               <UserPlus size={14} />
-              <span>Complete Registration & Issue Code</span>
+              <span>{instantActivate ? 'Register & Activate Student' : 'Generate Activation Token'}</span>
             </Button>
           </div>
         </form>
