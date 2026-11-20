@@ -33,9 +33,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, ch
     // Role mismatch: redirect to the user's role-appropriate home
     if (role === 'student') {
       return <Navigate to="/student/dashboard" replace />;
-    } else if (role === 'teacher') {
+    } else if (role === 'teacher' || role === 'advisor') {
       return <Navigate to="/teacher/dashboard" replace />;
-    } else if (role === 'admin') {
+    } else if (role === 'admin' || role === 'university_admin' || role === 'dept_admin') {
       return <Navigate to="/admin/users" replace />;
     }
     return <Navigate to="/login" replace />;

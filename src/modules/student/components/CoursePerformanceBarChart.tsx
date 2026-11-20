@@ -126,9 +126,13 @@ export const CoursePerformanceBarChart: React.FC<CoursePerformanceBarChartProps>
                       {c.gradedCount}/{c.totalAssessments} graded
                     </span>
                     <span
-                      className={`px-2 py-0.5 rounded text-xs font-bold font-mono border ${badgeBg}`}
+                      className={`px-2 py-0.5 rounded text-xs font-bold font-mono border whitespace-nowrap ${badgeBg}`}
                     >
-                      {pct !== null ? `${pct}%` : 'Unrecorded'}
+                      {pct !== null
+                        ? `${pct}%`
+                        : c.totalAssessments === 0
+                        ? 'No assessments yet'
+                        : 'Pending grades'}
                     </span>
                   </div>
                 </div>

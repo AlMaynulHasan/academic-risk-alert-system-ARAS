@@ -262,12 +262,15 @@ export const StudentDetailPage: React.FC = () => {
       let gradedCount = 0;
       cItems.forEach((i) => {
         if (i.mark && i.mark.obtainedMarks !== null && i.mark.obtainedMarks !== undefined) {
-          obtained += i.mark.obtainedMarks;
+          obtained += Math.min(i.assessment.maxMarks, Math.max(0, i.mark.obtainedMarks));
           max += i.assessment.maxMarks;
           gradedCount++;
         }
       });
-      const pct = gradedCount > 0 && max > 0 ? Math.round(((obtained / max) * 100) * 10) / 10 : null;
+      const pct =
+        gradedCount > 0 && max > 0
+          ? Math.min(100, Math.max(0, Math.round(((obtained / max) * 100) * 10) / 10))
+          : null;
       return {
         courseCode: enr.courseCode,
         courseTitle: enr.courseTitle,
@@ -283,7 +286,7 @@ export const StudentDetailPage: React.FC = () => {
       const obtained = item.mark ? item.mark.obtainedMarks : null;
       const pct =
         obtained !== null && item.assessment.maxMarks > 0
-          ? Math.round(((obtained / item.assessment.maxMarks) * 100) * 10) / 10
+          ? Math.min(100, Math.max(0, Math.round(((obtained / item.assessment.maxMarks) * 100) * 10) / 10))
           : null;
       return {
         courseCode: course ? course.courseCode : undefined,

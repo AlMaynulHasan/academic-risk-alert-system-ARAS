@@ -33,18 +33,29 @@ export const StudentAttendancePage: React.FC = () => {
 
   useEffect(() => {
     if (!user?.id) return;
-    setLoading(true);
-
-    Promise.all([
-      academicRecordService.getEnrollments(user.id, '2026-spring'),
-      academicRecordService.getAttendance(user.id),
-    ])
-      .then(([enrs, att]) => {
+    let active = true;
+    const loadAttendance = async () => {
+      setLoading(true);
+      try {
+        const sems = await academicRecordService.getSemesters();
+        const currentSem = sems.find((s) => s.isCurrent) || sems[0];
+        const [enrs, att] = await Promise.all([
+          academicRecordService.getEnrollments(user.id, currentSem?.id),
+          academicRecordService.getAttendance(user.id),
+        ]);
+        if (!active) return;
         setCourses(enrs);
         setAttendanceSummary(att);
-      })
-      .catch((err) => console.error('Error fetching attendance data:', err))
-      .finally(() => setLoading(false));
+      } catch (err) {
+        console.error('Error fetching attendance data:', err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    loadAttendance();
+    return () => {
+      active = false;
+    };
   }, [user?.id]);
 
   const courseMap = useMemo(() => {
@@ -236,7 +247,9 @@ export const StudentAttendancePage: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-[10px] uppercase text-slate-500 block">Attended</span>
-                    <strong className="text-emerald-700 tabular-nums">{cb.attended}</strong>
+                    <strong className="text-emerald-700 tabular-nums">
+                      {Number.isInteger(cb.attended) ? cb.attended : cb.attended.toFixed(1)}
+                    </strong>
                   </div>
                   <div>
                     <span className="text-[10px] uppercase text-slate-500 block">Absent</span>

@@ -3,11 +3,9 @@ import { Modal } from '../../../shared/ui/Modal';
 import { Button } from '../../../shared/ui/Button';
 import { FormField } from '../../../shared/ui/FormField';
 import { CourseOffering, User } from '../../../shared/types';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../../../shared/firebase';
+import { academicRecordService } from '../../../shared/services/academicRecordService';
 import { useAuth } from '../../core/AuthContext';
 import { useToast } from '../../../shared/ui/Toast';
-import { getCurrentUtcIso } from '../../../shared/utils/date';
 import { AlertCircle, UserCheck, Users, BookOpen } from 'lucide-react';
 
 interface AssignCourseTeacherModalProps {
@@ -28,19 +26,24 @@ export const AssignCourseTeacherModal: React.FC<AssignCourseTeacherModalProps> =
   const { user } = useAuth();
   const { showToast } = useToast();
 
-  const [selectedTeacherId, setSelectedTeacherId] = useState<string>(
-    offering?.teacherIds?.[0] || ''
+  const eligibleTeachers = React.useMemo(
+    () => teachers.filter((t) => t.role === 'teacher'),
+    [teachers]
   );
+
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Sync selected teacher whenever offering changes
+  // Sync selected teacher whenever offering changes (ignoring non-teacher IDs)
   React.useEffect(() => {
     if (offering) {
-      setSelectedTeacherId(offering.teacherIds?.[0] || '');
+      const validId =
+        offering.teacherIds?.find((id) => eligibleTeachers.some((t) => t.id === id)) || '';
+      setSelectedTeacherId(validId);
       setError(null);
     }
-  }, [offering]);
+  }, [offering, eligibleTeachers]);
 
   if (!offering) return null;
 
@@ -49,19 +52,16 @@ export const AssignCourseTeacherModal: React.FC<AssignCourseTeacherModalProps> =
     setError(null);
 
     setIsSubmitting(true);
-    const now = getCurrentUtcIso();
 
     try {
       const teacherIds = selectedTeacherId ? [selectedTeacherId] : [];
-      await setDoc(
-        doc(db, 'courseOfferings', offering.id),
+      await academicRecordService.updateCourseOffering(
+        offering.id,
         {
           ...offering,
           teacherIds,
-          updatedAt: now,
-          updatedBy: user?.id || 'admin',
         },
-        { merge: true }
+        user ? { uid: user.id, role: user.role } : undefined
       );
 
       const assignedTeacher = teachers.find((t) => t.id === selectedTeacherId);
@@ -124,13 +124,15 @@ export const AssignCourseTeacherModal: React.FC<AssignCourseTeacherModalProps> =
               className="w-full text-xs rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#00a651]/40"
             >
               <option value="">-- No Teacher Assigned (Unassigned) --</option>
-              {teachers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.displayName} ({t.email}) {t.designation ? `— ${t.designation}` : ''} {t.departmentId ? `[${t.departmentId}]` : ''}
-                </option>
-              ))}
+              {teachers
+                .filter((t) => t.role === 'teacher')
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.displayName} ({t.email}) {t.designation ? `— ${t.designation}` : ''} {t.departmentId ? `[${t.departmentId}]` : ''}
+                  </option>
+                ))}
             </select>
-            {teachers.length === 0 && (
+            {teachers.filter((t) => t.role === 'teacher').length === 0 && (
               <p className="text-[11px] text-amber-700">
                 No faculty members registered yet. Create a teacher first in the Users & Roles tab!
               </p>

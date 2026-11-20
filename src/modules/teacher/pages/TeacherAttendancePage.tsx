@@ -49,6 +49,7 @@ interface StudentRosterItem {
   status: AttendanceStatus;
   notes: string;
   pastAttendanceRate?: number;
+  hasSavedRecord?: boolean;
 }
 
 export const TeacherAttendancePage: React.FC = () => {
@@ -118,7 +119,7 @@ export const TeacherAttendancePage: React.FC = () => {
     };
 
     loadOfferings();
-  }, [user?.id, role, searchParams]);
+  }, [user?.id, role]);
 
   // When selected offering changes, load enrolled students
   useEffect(() => {
@@ -130,22 +131,37 @@ export const TeacherAttendancePage: React.FC = () => {
         const offering = offerings.find((o) => o.id === selectedOfferingId);
         if (!offering) return;
 
-        // Fetch enrollments and user profiles
-        const [allEnrollments, usersSnap, profilesSnap] = await Promise.all([
+        // Fetch enrollments, user profiles, and existing course attendance records
+        const [allEnrollments, usersSnap, profilesSnap, courseAttendanceRecords] = await Promise.all([
           academicRecordService.getAllEnrollments(offering.semesterId),
-          getDocs(collection(db, 'users')),
-          getDocs(collection(db, 'studentProfiles')),
+          getDocs(collection(db, 'users')).catch(() => null),
+          getDocs(collection(db, 'studentProfiles')).catch(() => null),
+          academicRecordService.getCourseAttendance(offering.courseId),
         ]);
 
         const usersMap = new Map<string, UserType>();
-        usersSnap.forEach((d) => {
+        usersSnap?.forEach((d) => {
           usersMap.set(d.id, { id: d.id, ...(d.data() as Omit<UserType, 'id'>) });
         });
 
         const profilesMap = new Map<string, StudentProfile>();
-        profilesSnap.forEach((d) => {
+        profilesSnap?.forEach((d) => {
           profilesMap.set(d.id, { id: d.id, ...(d.data() as Omit<StudentProfile, 'id'>) });
         });
+
+        try {
+          const demoUsers = JSON.parse(localStorage.getItem('aras_demo_registered_users') || '{}');
+          Object.values(demoUsers).forEach((entry: any) => {
+            if (entry?.user && !usersMap.has(entry.user.id)) {
+              usersMap.set(entry.user.id, entry.user);
+            }
+            if (entry?.profile && !profilesMap.has(entry.profile.id)) {
+              profilesMap.set(entry.profile.id, entry.profile);
+            }
+          });
+        } catch {
+          // Ignore malformed local demo cache
+        }
 
         // Filter enrollments for this offering/course
         const matchedEnrollments = allEnrollments.filter(
@@ -203,15 +219,37 @@ export const TeacherAttendancePage: React.FC = () => {
             fallbackIdentifier = 'CSE-2022-088';
           }
 
+          // Hydrate status and notes from saved attendance record for selected date
+          const studentCourseRecords = courseAttendanceRecords.filter(
+            (r) => r.studentId === enr.studentId
+          );
+          const existingForDate = studentCourseRecords.find(
+            (r) => r.date === sessionDate
+          );
+
+          // Compute real course attendance rate if records exist
+          let computedRate: number | undefined;
+          if (studentCourseRecords.length > 0) {
+            let attended = 0;
+            studentCourseRecords.forEach((r) => {
+              if (r.status === 'present' || r.status === 'excused') attended += 1;
+              else if (r.status === 'late') attended += 0.5;
+            });
+            computedRate = Math.round(((attended / studentCourseRecords.length) * 100) * 10) / 10;
+          } else if (enr.studentId === 'demo-student-01' || enr.studentId === 'demo-student-02') {
+            computedRate = enr.studentId === 'demo-student-02' ? 63.3 : 88.5;
+          }
+
           return {
             studentId: enr.studentId,
             enrollmentId: enr.enrollmentId,
             name: userDoc?.displayName || fallbackName,
             studentIdentifier: profileDoc?.studentId || fallbackIdentifier,
             department: profileDoc?.department || 'Computer Science & Engineering',
-            status: 'present', // Default to present
-            notes: '',
-            pastAttendanceRate: enr.studentId === 'demo-student-02' ? 63.3 : 88.5,
+            status: existingForDate ? existingForDate.status : 'present',
+            notes: existingForDate ? existingForDate.notes || '' : '',
+            pastAttendanceRate: computedRate,
+            hasSavedRecord: Boolean(existingForDate),
           };
         });
 
@@ -224,7 +262,7 @@ export const TeacherAttendancePage: React.FC = () => {
     };
 
     loadRoster();
-  }, [selectedOfferingId, offerings]);
+  }, [selectedOfferingId, sessionDate, offerings]);
 
   const handleStatusChange = (studentId: string, status: AttendanceStatus) => {
     setRoster((prev) =>
@@ -283,8 +321,10 @@ export const TeacherAttendancePage: React.FC = () => {
         }
       }
 
+      setRoster((prev) => prev.map((item) => ({ ...item, hasSavedRecord: true })));
+
       showToast(
-        `Attendance recorded for ${successCount} of ${roster.length} students. Risk scores updated!`,
+        `Attendance recorded for ${successCount} of ${roster.length} students on ${sessionDate}. Risk scores updated!`,
         'success'
       );
     } catch (err: unknown) {
@@ -536,7 +576,14 @@ export const TeacherAttendancePage: React.FC = () => {
                             {item.name.charAt(0)}
                           </div>
                           <div>
-                            <div className="font-bold text-slate-900">{item.name}</div>
+                            <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                              <span>{item.name}</span>
+                              {item.hasSavedRecord && (
+                                <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  Saved
+                                </span>
+                              )}
+                            </div>
                             <Link
                               to={`/teacher/students/${item.studentId}`}
                               className="text-[10px] text-blue-600 hover:text-blue-800 font-medium"

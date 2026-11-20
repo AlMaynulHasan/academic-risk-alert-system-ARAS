@@ -43,6 +43,35 @@ export function formatDhakaDateOnly(dateOrIso: string | Date | null | undefined)
 }
 
 /**
+ * Formats a date or YYYY-MM-DD string into short human-readable date (e.g. "Mar 1" or "Mar 1, 2026") in Asia/Dhaka.
+ */
+export function formatDhakaShortDate(
+  dateOrIso: string | Date | null | undefined,
+  includeYear = false
+): string {
+  if (!dateOrIso) return '—';
+  let date: Date;
+  if (typeof dateOrIso === 'string') {
+    const trimmed = dateOrIso.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      date = new Date(`${trimmed}T12:00:00+06:00`);
+    } else {
+      date = new Date(trimmed);
+    }
+  } else {
+    date = dateOrIso;
+  }
+  if (isNaN(date.getTime())) return '—';
+
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: TIMEZONE,
+    month: 'short',
+    day: 'numeric',
+    ...(includeYear ? { year: 'numeric' } : {}),
+  }).format(date);
+}
+
+/**
  * Returns current month string in Asia/Dhaka as YYYY-MM (for alert counter keys).
  */
 export function getCurrentDhakaMonthPeriod(): string {

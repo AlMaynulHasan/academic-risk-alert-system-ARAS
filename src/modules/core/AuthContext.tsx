@@ -206,6 +206,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(data);
         setRole(data.role);
         setIsDemoSession(false);
+        localStorage.removeItem('aras_demo_session_email');
 
         // Fetch studentProfile if student
         if (data.role === 'student') {

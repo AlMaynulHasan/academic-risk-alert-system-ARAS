@@ -203,6 +203,8 @@ export interface IAcademicRecordService {
 
   // Academic Records
   getAttendance(studentId: string, courseId?: string): Promise<AttendanceSummary>;
+  getCourseAttendance(courseId: string, date?: string): Promise<AttendanceRecord[]>;
+  getAssessmentMarks(assessmentId: string): Promise<Mark[]>;
   getMarks(studentId: string, courseId?: string): Promise<MarksSummary>;
   getStudentProfile(studentId: string): Promise<StudentProfile | null>;
   upsertAttendance(
@@ -244,6 +246,101 @@ export class AcademicRecordService implements IAcademicRecordService {
       localStorage.setItem('aras_custom_semesters', JSON.stringify(list));
     } catch (e) {
       console.warn('Could not save local semester:', e);
+    }
+  }
+
+  private getLocalAttendanceRecords(): AttendanceRecord[] {
+    try {
+      if (typeof localStorage === 'undefined') return [];
+      const raw = localStorage.getItem('aras_demo_attendance_records');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private saveLocalAttendanceRecord(rec: AttendanceRecord): void {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const list = this.getLocalAttendanceRecords();
+      const idx = list.findIndex((r) => r.id === rec.id);
+      if (idx >= 0) {
+        list[idx] = rec;
+      } else {
+        list.push(rec);
+      }
+      localStorage.setItem('aras_demo_attendance_records', JSON.stringify(list));
+    } catch (e) {
+      console.warn('Could not save local attendance record:', e);
+    }
+  }
+
+  private getLocalAssessments(): Assessment[] {
+    try {
+      if (typeof localStorage === 'undefined') return [];
+      const raw = localStorage.getItem('aras_demo_assessments');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private saveLocalAssessment(asmt: Assessment): void {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const list = this.getLocalAssessments();
+      const idx = list.findIndex((a) => a.id === asmt.id);
+      if (idx >= 0) list[idx] = asmt;
+      else list.push(asmt);
+      localStorage.setItem('aras_demo_assessments', JSON.stringify(list));
+    } catch (e) {
+      console.warn('Could not save local assessment:', e);
+    }
+  }
+
+  private getLocalMarks(): Mark[] {
+    try {
+      if (typeof localStorage === 'undefined') return [];
+      const raw = localStorage.getItem('aras_demo_marks');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private saveLocalMark(mark: Mark): void {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const list = this.getLocalMarks();
+      const idx = list.findIndex((m) => m.id === mark.id);
+      if (idx >= 0) list[idx] = mark;
+      else list.push(mark);
+      localStorage.setItem('aras_demo_marks', JSON.stringify(list));
+    } catch (e) {
+      console.warn('Could not save local mark:', e);
+    }
+  }
+
+  private getLocalCourseOfferings(): CourseOffering[] {
+    try {
+      if (typeof localStorage === 'undefined') return [];
+      const raw = localStorage.getItem('aras_demo_course_offerings');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private saveLocalCourseOffering(offering: CourseOffering): void {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const list = this.getLocalCourseOfferings();
+      const idx = list.findIndex((o) => o.id === offering.id);
+      if (idx >= 0) list[idx] = { ...list[idx], ...offering };
+      else list.push(offering);
+      localStorage.setItem('aras_demo_course_offerings', JSON.stringify(list));
+    } catch (e) {
+      console.warn('Could not save local course offering:', e);
     }
   }
 
@@ -364,74 +461,155 @@ export class AcademicRecordService implements IAcademicRecordService {
    * Fetches attendance summary and records for a student
    */
   async getAttendance(studentId: string, courseId?: string): Promise<AttendanceSummary> {
+    const mergedMap = new Map<string, AttendanceRecord>();
+    const localRecords = this.getLocalAttendanceRecords().filter(
+      (r) => r.studentId === studentId && (!courseId || r.courseId === courseId)
+    );
+    localRecords.forEach((r) => mergedMap.set(r.id, r));
+
     try {
       const attRef = collection(db, 'attendanceRecords');
       const q = query(attRef, where('studentId', '==', studentId));
       const snap = await getDocs(q);
 
-      const records: AttendanceRecord[] = [];
       snap.forEach((d) => {
         const item = { id: d.id, ...(d.data() as Omit<AttendanceRecord, 'id'>) };
         if (!courseId || item.courseId === courseId) {
-          records.push(item);
+          const existing = mergedMap.get(item.id);
+          if (!existing || (item.updatedAt || '') >= (existing.updatedAt || '')) {
+            mergedMap.set(item.id, item);
+          }
         }
       });
-
-      // Sort by date descending for scannable history
-      records.sort((a, b) => b.date.localeCompare(a.date));
-
-      const totalClasses = records.length;
-      let attendedClasses = 0;
-      records.forEach((r) => {
-        if (r.status === 'present') attendedClasses += 1;
-        else if (r.status === 'late') attendedClasses += 0.5;
-        else if (r.status === 'excused') attendedClasses += 1;
-      });
-
-      const percentage =
-        totalClasses > 0 ? Math.round(((attendedClasses / totalClasses) * 100) * 10) / 10 : 100;
-
-      return {
-        studentId,
-        courseId,
-        totalClasses,
-        attendedClasses,
-        percentage,
-        records,
-      };
     } catch (err) {
       console.warn(`AcademicRecordService.getAttendance error for ${studentId}:`, err);
-      return {
-        studentId,
-        courseId,
-        totalClasses: 0,
-        attendedClasses: 0,
-        percentage: 100,
-        records: [],
-      };
     }
+
+    let records = Array.from(mergedMap.values()).sort((a, b) => b.date.localeCompare(a.date));
+
+    if (!courseId) {
+      try {
+        const enrollments = await this.getEnrollments(studentId);
+        const activeCourseIds = new Set(
+          enrollments.filter((e) => e.status !== 'dropped').map((e) => e.courseId)
+        );
+        if (activeCourseIds.size > 0) {
+          records = records.filter((r) => activeCourseIds.has(r.courseId));
+        }
+      } catch (enrErr) {
+        console.warn(`Could not filter attendance by enrollment for ${studentId}:`, enrErr);
+      }
+    }
+
+    const totalClasses = records.length;
+    let attendedClasses = 0;
+    records.forEach((r) => {
+      if (r.status === 'present') attendedClasses += 1;
+      else if (r.status === 'late') attendedClasses += 0.5;
+      else if (r.status === 'excused') attendedClasses += 1;
+    });
+
+    const rawPercentage =
+      totalClasses > 0 ? Math.round(((attendedClasses / totalClasses) * 100) * 10) / 10 : 100;
+    const percentage = Math.min(100, Math.max(0, rawPercentage));
+
+    return {
+      studentId,
+      courseId,
+      totalClasses,
+      attendedClasses,
+      percentage,
+      records,
+    };
+  }
+
+  /**
+   * Fetches all attendance records for a specific course (optionally filtered by date)
+   */
+  async getCourseAttendance(courseId: string, date?: string): Promise<AttendanceRecord[]> {
+    const mergedMap = new Map<string, AttendanceRecord>();
+    const localRecords = this.getLocalAttendanceRecords().filter(
+      (r) => r.courseId === courseId && (!date || r.date === date)
+    );
+    localRecords.forEach((r) => mergedMap.set(r.id, r));
+
+    try {
+      const attRef = collection(db, 'attendanceRecords');
+      const q = query(attRef, where('courseId', '==', courseId));
+      const snap = await getDocs(q);
+
+      snap.forEach((d) => {
+        const item = { id: d.id, ...(d.data() as Omit<AttendanceRecord, 'id'>) };
+        if (!date || item.date === date) {
+          const existing = mergedMap.get(item.id);
+          if (!existing || (item.updatedAt || '') >= (existing.updatedAt || '')) {
+            mergedMap.set(item.id, item);
+          }
+        }
+      });
+    } catch (err) {
+      console.warn(`AcademicRecordService.getCourseAttendance error for ${courseId}:`, err);
+    }
+
+    return Array.from(mergedMap.values()).sort((a, b) => b.date.localeCompare(a.date));
   }
 
   /**
    * Fetches assessments for a given course
    */
   async getAssessments(courseId: string): Promise<Assessment[]> {
+    const mergedMap = new Map<string, Assessment>();
+    this.getLocalAssessments()
+      .filter((a) => a.courseId === courseId)
+      .forEach((a) => mergedMap.set(a.id, a));
+
     try {
       const asmRef = collection(db, 'assessments');
       const q = query(asmRef, where('courseId', '==', courseId));
       const snap = await getDocs(q);
 
-      const list: Assessment[] = [];
       snap.forEach((d) => {
-        list.push({ id: d.id, ...(d.data() as Omit<Assessment, 'id'>) });
+        const item = { id: d.id, ...(d.data() as Omit<Assessment, 'id'>) };
+        const existing = mergedMap.get(item.id);
+        if (!existing || (item.updatedAt || '') >= (existing.updatedAt || '')) {
+          mergedMap.set(item.id, item);
+        }
       });
-
-      // Sort chronologically by dueDate
-      return list.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
     } catch (err) {
       console.warn(`AcademicRecordService.getAssessments error for ${courseId}:`, err);
-      return [];
     }
+
+    // Sort chronologically by dueDate
+    return Array.from(mergedMap.values()).sort(
+      (a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+    );
+  }
+
+  /**
+   * Fetches all student marks for a specific assessment (merging Firestore + local cache)
+   */
+  async getAssessmentMarks(assessmentId: string): Promise<Mark[]> {
+    const mergedMap = new Map<string, Mark>();
+    this.getLocalMarks()
+      .filter((m) => m.assessmentId === assessmentId)
+      .forEach((m) => mergedMap.set(m.studentId, m));
+
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'marks'), where('assessmentId', '==', assessmentId))
+      );
+      snap.forEach((d) => {
+        const item = { id: d.id, ...(d.data() as Omit<Mark, 'id'>) };
+        const existing = mergedMap.get(item.studentId);
+        if (!existing || (item.updatedAt || '') >= (existing.updatedAt || '')) {
+          mergedMap.set(item.studentId, item);
+        }
+      });
+    } catch (err) {
+      console.warn(`AcademicRecordService.getAssessmentMarks warning for ${assessmentId}:`, err);
+    }
+
+    return Array.from(mergedMap.values());
   }
 
   /**
@@ -441,44 +619,79 @@ export class AcademicRecordService implements IAcademicRecordService {
   async getMarks(studentId: string, courseId?: string): Promise<MarksSummary> {
     try {
       // 1. Fetch assessments for course (or all courses if not specified)
-      let assessments: Assessment[] = [];
+      const assessmentsMap = new Map<string, Assessment>();
       if (courseId) {
-        assessments = await this.getAssessments(courseId);
+        const list = await this.getAssessments(courseId);
+        list.forEach((a) => assessmentsMap.set(a.id, a));
       } else {
-        const snap = await getDocs(collection(db, 'assessments'));
-        snap.forEach((d) => assessments.push({ id: d.id, ...(d.data() as Omit<Assessment, 'id'>) }));
+        this.getLocalAssessments().forEach((a) => assessmentsMap.set(a.id, a));
+        try {
+          const snap = await getDocs(collection(db, 'assessments'));
+          snap.forEach((d) => {
+            const item = { id: d.id, ...(d.data() as Omit<Assessment, 'id'>) };
+            assessmentsMap.set(item.id, item);
+          });
+        } catch (asmtErr) {
+          console.warn('AcademicRecordService.getMarks assessments warning:', asmtErr);
+        }
+      }
+      let assessments = Array.from(assessmentsMap.values());
+      if (!courseId) {
+        try {
+          const enrollments = await this.getEnrollments(studentId);
+          const activeCourseIds = new Set(
+            enrollments.filter((e) => e.status !== 'dropped').map((e) => e.courseId)
+          );
+          if (activeCourseIds.size > 0) {
+            assessments = assessments.filter((a) => activeCourseIds.has(a.courseId));
+          }
+        } catch (enrErr) {
+          console.warn(`Could not filter marks by enrollment for ${studentId}:`, enrErr);
+        }
       }
 
-      // 2. Fetch marks by student
-      const marksRef = collection(db, 'marks');
-      const q = query(marksRef, where('studentId', '==', studentId));
-      const snap = await getDocs(q);
-
+      // 2. Fetch marks by student (merge local cache + Firestore by latest updatedAt)
       const marksMap = new Map<string, Mark>();
-      snap.forEach((d) => {
-        const m = { id: d.id, ...(d.data() as Omit<Mark, 'id'>) };
-        marksMap.set(m.assessmentId, m);
-      });
+      this.getLocalMarks()
+        .filter((m) => m.studentId === studentId)
+        .forEach((m) => marksMap.set(m.assessmentId, m));
+
+      try {
+        const marksRef = collection(db, 'marks');
+        const q = query(marksRef, where('studentId', '==', studentId));
+        const snap = await getDocs(q);
+
+        snap.forEach((d) => {
+          const m = { id: d.id, ...(d.data() as Omit<Mark, 'id'>) };
+          const existing = marksMap.get(m.assessmentId);
+          if (!existing || (m.updatedAt || '') >= (existing.updatedAt || '')) {
+            marksMap.set(m.assessmentId, m);
+          }
+        });
+      } catch (fsErr) {
+        console.warn(`AcademicRecordService.getMarks Firestore warning for ${studentId}:`, fsErr);
+      }
 
       let totalObtained = 0;
       let totalMaxMarks = 0;
-      let recordedCount = 0;
       let missingCount = 0;
 
       const items = assessments.map((asmt) => {
         const mark = marksMap.get(asmt.id) || null;
         if (mark && mark.obtainedMarks !== null && mark.obtainedMarks !== undefined) {
-          totalObtained += mark.obtainedMarks;
+          const boundedScore = Math.min(asmt.maxMarks, Math.max(0, mark.obtainedMarks));
+          totalObtained += boundedScore;
           totalMaxMarks += asmt.maxMarks;
-          recordedCount++;
         } else {
           missingCount++;
         }
         return { assessment: asmt, mark };
       });
 
-      const percentage =
+      const rawPercentage =
         totalMaxMarks > 0 ? Math.round(((totalObtained / totalMaxMarks) * 100) * 10) / 10 : null;
+      const percentage =
+        rawPercentage !== null ? Math.min(100, Math.max(0, rawPercentage)) : null;
 
       return {
         studentId,
@@ -942,12 +1155,18 @@ export class AcademicRecordService implements IAcademicRecordService {
       createdBy: actor?.uid || 'teacher',
     };
 
+    this.saveLocalAssessment(payload);
+
     try {
       await setDoc(doc(db, 'assessments', docId), payload);
       return docId;
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `assessments/${docId}`);
-      throw err;
+      console.warn(`Firestore assessment write note for ${docId}:`, err);
+      const isDemo = typeof localStorage !== 'undefined' && Boolean(localStorage.getItem('aras_demo_session_email'));
+      if (!isDemo && auth.currentUser) {
+        handleFirestoreError(err, OperationType.WRITE, `assessments/${docId}`);
+      }
+      return docId;
     }
   }
 
@@ -1191,10 +1410,17 @@ export class AcademicRecordService implements IAcademicRecordService {
       createdBy: actor?.uid || record.createdBy || 'system',
     };
 
+    // Always cache locally so date switches & reloads preserve changes immediately
+    this.saveLocalAttendanceRecord(payload);
+
     try {
       await setDoc(doc(db, 'attendanceRecords', docId), payload);
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `attendanceRecords/${docId}`);
+      console.warn(`Firestore attendance write note for ${docId}:`, err);
+      const isDemo = typeof localStorage !== 'undefined' && Boolean(localStorage.getItem('aras_demo_session_email'));
+      if (!isDemo && auth.currentUser) {
+        handleFirestoreError(err, OperationType.WRITE, `attendanceRecords/${docId}`);
+      }
     }
 
     // 5. Shared change hook invocation
@@ -1216,12 +1442,22 @@ export class AcademicRecordService implements IAcademicRecordService {
       throw new Error('VALIDATION_ERROR: studentId, assessmentId, and enrollmentId are required.');
     }
 
-    // Fetch assessment to validate against maxMarks
-    const asmtSnap = await getDoc(doc(db, 'assessments', record.assessmentId));
-    if (!asmtSnap.exists()) {
+    // Fetch assessment (Firestore or local demo cache) to validate against maxMarks
+    let asmt: Assessment | undefined;
+    try {
+      const asmtSnap = await getDoc(doc(db, 'assessments', record.assessmentId));
+      if (asmtSnap.exists()) {
+        asmt = asmtSnap.data() as Assessment;
+      }
+    } catch (e) {
+      console.warn('Could not fetch assessment from Firestore, checking local cache:', e);
+    }
+    if (!asmt) {
+      asmt = this.getLocalAssessments().find((a) => a.id === record.assessmentId);
+    }
+    if (!asmt) {
       throw new Error(`NOT_FOUND: Assessment with ID "${record.assessmentId}" does not exist.`);
     }
-    const asmt = asmtSnap.data() as Assessment;
 
     if (record.obtainedMarks !== null && record.obtainedMarks !== undefined) {
       if (typeof record.obtainedMarks !== 'number' || isNaN(record.obtainedMarks)) {
@@ -1253,10 +1489,17 @@ export class AcademicRecordService implements IAcademicRecordService {
       createdBy: actor?.uid || record.createdBy || 'system',
     };
 
+    // Always cache locally so reloads preserve saved marks seamlessly
+    this.saveLocalMark(payload);
+
     try {
       await setDoc(doc(db, 'marks', docId), payload);
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `marks/${docId}`);
+      console.warn(`Firestore mark write note for ${docId}:`, err);
+      const isDemo = typeof localStorage !== 'undefined' && Boolean(localStorage.getItem('aras_demo_session_email'));
+      if (!isDemo && auth.currentUser) {
+        handleFirestoreError(err, OperationType.WRITE, `marks/${docId}`);
+      }
     }
 
     // Shared change hook invocation
@@ -1360,20 +1603,30 @@ export class AcademicRecordService implements IAcademicRecordService {
 
   // --- Course Offerings Management ---
   async getCourseOfferings(semesterId?: string, departmentId?: string): Promise<CourseOffering[]> {
+    const mergedMap = new Map<string, CourseOffering>();
+    this.getLocalCourseOfferings().forEach((o) => {
+      if (!semesterId || o.semesterId === semesterId) {
+        mergedMap.set(o.id, o);
+      }
+    });
+
     try {
       const snap = await getDocs(collection(db, 'courseOfferings'));
-      const list: CourseOffering[] = [];
       snap.forEach((d) => {
-        list.push({ id: d.id, ...(d.data() as Omit<CourseOffering, 'id'>) });
+        const item = { id: d.id, ...(d.data() as Omit<CourseOffering, 'id'>) };
+        if (!semesterId || item.semesterId === semesterId) {
+          const existing = mergedMap.get(item.id);
+          if (!existing || (item.updatedAt || '') >= (existing.updatedAt || '')) {
+            mergedMap.set(item.id, item);
+          }
+        }
       });
-
-      let filtered = list;
-      if (semesterId) {
-        filtered = filtered.filter((o) => o.semesterId === semesterId);
-      }
-      if (filtered.length > 0) return filtered;
     } catch (err) {
       console.warn('AcademicRecordService.getCourseOfferings warning:', err);
+    }
+
+    if (mergedMap.size > 0) {
+      return Array.from(mergedMap.values());
     }
 
     // Backward-compatibility: Synthesize course offerings from active courses and current semester
@@ -1382,19 +1635,26 @@ export class AcademicRecordService implements IAcademicRecordService {
     const curSem = semesters.find((s) => s.isCurrent) || semesters[0];
     const targetSemId = semesterId || (curSem ? curSem.id : '2026-spring');
 
-    return courses.map((c) => ({
-      id: `off_${targetSemId}_${c.id}_A`,
-      courseId: c.id,
-      courseCode: c.code,
-      courseTitle: c.title,
-      semesterId: targetSemId,
-      section: 'A',
-      teacherIds: [c.createdBy || 'demo-teacher-01'],
-      status: 'active' as const,
-      createdAt: c.createdAt,
-      updatedAt: c.updatedAt,
-      createdBy: c.createdBy,
-    }));
+    return courses.map((c) => {
+      const creatorIsAdmin =
+        !c.createdBy ||
+        c.createdBy === 'admin' ||
+        c.createdBy === 'system' ||
+        c.createdBy.includes('admin');
+      return {
+        id: `off_${targetSemId}_${c.id}_A`,
+        courseId: c.id,
+        courseCode: c.code,
+        courseTitle: c.title,
+        semesterId: targetSemId,
+        section: 'A',
+        teacherIds: [creatorIsAdmin ? 'demo-teacher-01' : c.createdBy!],
+        status: 'active' as const,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        createdBy: c.createdBy,
+      };
+    });
   }
 
   async createCourseOffering(
@@ -1424,11 +1684,17 @@ export class AcademicRecordService implements IAcademicRecordService {
       createdBy: actor?.uid || offering.createdBy || 'system',
     };
 
+    this.saveLocalCourseOffering(payload);
+
     try {
       await setDoc(doc(db, 'courseOfferings', docId), payload);
       return docId;
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `courseOfferings/${docId}`);
+      console.warn(`Firestore courseOffering write note for ${docId}:`, err);
+      const isDemo = typeof localStorage !== 'undefined' && Boolean(localStorage.getItem('aras_demo_session_email'));
+      if (!isDemo && auth.currentUser) {
+        handleFirestoreError(err, OperationType.WRITE, `courseOfferings/${docId}`);
+      }
       return docId;
     }
   }
@@ -1439,6 +1705,16 @@ export class AcademicRecordService implements IAcademicRecordService {
     actor?: { uid: string; role: string }
   ): Promise<void> {
     const now = getCurrentUtcIso();
+    const existingLocal = this.getLocalCourseOfferings().find((o) => o.id === offeringId);
+    if (existingLocal || updates.courseId) {
+      this.saveLocalCourseOffering({
+        ...(existingLocal || ({} as CourseOffering)),
+        ...updates,
+        id: offeringId,
+        updatedAt: now,
+      });
+    }
+
     try {
       await setDoc(
         doc(db, 'courseOfferings', offeringId),
@@ -1449,7 +1725,11 @@ export class AcademicRecordService implements IAcademicRecordService {
         { merge: true }
       );
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `courseOfferings/${offeringId}`);
+      console.warn(`Firestore courseOffering update note for ${offeringId}:`, err);
+      const isDemo = typeof localStorage !== 'undefined' && Boolean(localStorage.getItem('aras_demo_session_email'));
+      if (!isDemo && auth.currentUser) {
+        handleFirestoreError(err, OperationType.UPDATE, `courseOfferings/${offeringId}`);
+      }
     }
   }
 

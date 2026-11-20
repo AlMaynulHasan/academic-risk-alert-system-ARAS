@@ -37,7 +37,7 @@ import {
   StudentProfile,
   User as UserType
 } from '../../../shared/types';
-import { collection, getDocs, doc, setDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../../shared/firebase';
 import { getCurrentUtcIso } from '../../../shared/utils/date';
 
@@ -130,7 +130,7 @@ export const TeacherMarksPage: React.FC = () => {
     };
 
     loadOfferings();
-  }, [user?.id, role, searchParams]);
+  }, [user?.id, role]);
 
   // When selected offering changes, load assessments
   useEffect(() => {
@@ -174,19 +174,33 @@ export const TeacherMarksPage: React.FC = () => {
 
         const [allEnrollments, usersSnap, profilesSnap] = await Promise.all([
           academicRecordService.getAllEnrollments(offering.semesterId),
-          getDocs(collection(db, 'users')),
-          getDocs(collection(db, 'studentProfiles')),
+          getDocs(collection(db, 'users')).catch(() => null),
+          getDocs(collection(db, 'studentProfiles')).catch(() => null),
         ]);
 
         const usersMap = new Map<string, UserType>();
-        usersSnap.forEach((d) => {
+        usersSnap?.forEach((d) => {
           usersMap.set(d.id, { id: d.id, ...(d.data() as Omit<UserType, 'id'>) });
         });
 
         const profilesMap = new Map<string, StudentProfile>();
-        profilesSnap.forEach((d) => {
+        profilesSnap?.forEach((d) => {
           profilesMap.set(d.id, { id: d.id, ...(d.data() as Omit<StudentProfile, 'id'>) });
         });
+
+        try {
+          const demoUsers = JSON.parse(localStorage.getItem('aras_demo_registered_users') || '{}');
+          Object.values(demoUsers).forEach((entry: any) => {
+            if (entry?.user && !usersMap.has(entry.user.id)) {
+              usersMap.set(entry.user.id, entry.user);
+            }
+            if (entry?.profile && !profilesMap.has(entry.profile.id)) {
+              profilesMap.set(entry.profile.id, entry.profile);
+            }
+          });
+        } catch {
+          // Ignore malformed local demo cache
+        }
 
         const matchedEnrollments = allEnrollments.filter(
           (e) =>
@@ -227,22 +241,16 @@ export const TeacherMarksPage: React.FC = () => {
           ];
         }
 
-        // Fetch marks for selected assessment
+        // Fetch marks for selected assessment (Firestore + local fallback cache)
         const marksMap = new Map<string, Mark>();
         if (selectedAssessmentId) {
           try {
-            const marksSnap = await getDocs(
-              query(
-                collection(db, 'marks'),
-                where('assessmentId', '==', selectedAssessmentId)
-              )
-            );
-            marksSnap.forEach((d) => {
-              const markData = { id: d.id, ...(d.data() as Omit<Mark, 'id'>) };
+            const fetchedMarks = await academicRecordService.getAssessmentMarks(selectedAssessmentId);
+            fetchedMarks.forEach((markData) => {
               marksMap.set(markData.studentId, markData);
             });
           } catch (e) {
-            console.warn('Could not query marks from Firestore:', e);
+            console.warn('Could not query marks:', e);
           }
         }
 
@@ -297,6 +305,23 @@ export const TeacherMarksPage: React.FC = () => {
   const maxMarks = selectedAssessment?.maxMarks || 100;
 
   const handleScoreChange = (studentId: string, val: string) => {
+    if (val.trim() !== '') {
+      const num = Number(val);
+      if (!isNaN(num)) {
+        if (num < 0) {
+          showToast('Obtained marks cannot be negative (minimum 0).', 'warning');
+          return;
+        }
+        if (num > maxMarks) {
+          showToast(
+            `Entered marks (${num}) cannot exceed maximum marks (${maxMarks}).`,
+            'warning'
+          );
+          return;
+        }
+      }
+    }
+
     setStudentRows((prev) =>
       prev.map((row) => {
         if (row.studentId !== studentId) return row;
@@ -418,7 +443,13 @@ export const TeacherMarksPage: React.FC = () => {
         if (!row.isUnrecorded) {
           if (row.obtainedMarks.trim() === '') continue;
           const num = Number(row.obtainedMarks);
-          if (isNaN(num) || num < 0 || num > maxMarks) continue;
+          if (isNaN(num) || num < 0 || num > maxMarks) {
+            showToast(
+              `Skipped ${row.name}: score must be between 0 and ${maxMarks}.`,
+              'warning'
+            );
+            continue;
+          }
           score = num;
         }
 
@@ -492,18 +523,22 @@ export const TeacherMarksPage: React.FC = () => {
     }
   };
 
-  // Metrics
+  // Metrics (strictly bounded 0..maxMarks so average % never exceeds 100)
   const validScores = studentRows
+    .filter((r) => !r.isUnrecorded && r.obtainedMarks.trim() !== '')
     .map((r) => Number(r.obtainedMarks))
-    .filter((n) => !isNaN(n) && n >= 0);
+    .filter((n) => !isNaN(n) && n >= 0 && n <= maxMarks);
   const avgScore =
     validScores.length > 0
       ? (validScores.reduce((a, b) => a + b, 0) / validScores.length).toFixed(1)
       : 'N/A';
   const avgPct =
-    validScores.length > 0
-      ? ((Number(avgScore) / maxMarks) * 100).toFixed(0)
+    validScores.length > 0 && maxMarks > 0
+      ? Math.min(100, Math.max(0, Math.round((Number(avgScore) / maxMarks) * 100))).toString()
       : 'N/A';
+  const totalAllocatedWeight = assessments.reduce((sum, a) => sum + (a.weightage || 0), 0);
+  const remainingWeight = Math.max(0, 100 - totalAllocatedWeight);
+
   const missingCount = studentRows.filter(
     (r) => r.isUnrecorded || r.obtainedMarks.trim() === ''
   ).length;
@@ -642,6 +677,33 @@ export const TeacherMarksPage: React.FC = () => {
         </CardContent>
       </Card>
 
+      {/* Weightage Allocation Tracker */}
+      {selectedOfferingId && (
+        <div className="p-3 bg-white border border-slate-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-slate-700">Course Assessment Weightage:</span>
+            <span
+              className={`font-mono font-bold px-2 py-0.5 rounded border ${
+                totalAllocatedWeight === 100
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  : totalAllocatedWeight > 100
+                  ? 'bg-red-50 text-red-700 border-red-200'
+                  : 'bg-amber-50 text-amber-800 border-amber-200'
+              }`}
+            >
+              {totalAllocatedWeight}% / 100% allocated
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-500">
+            {totalAllocatedWeight === 100
+              ? 'Full 100% assessment rubric configured.'
+              : totalAllocatedWeight > 100
+              ? `Exceeds 100% by ${totalAllocatedWeight - 100}%. Please review task weightages.`
+              : `${remainingWeight}% unallocated weightage remaining for upcoming tasks (e.g., Midterm / Final).`}
+          </span>
+        </div>
+      )}
+
       {/* Summary KPI Strip */}
       {selectedAssessment && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -732,8 +794,20 @@ export const TeacherMarksPage: React.FC = () => {
                   {filteredRows.map((row) => {
                     const numScore = Number(row.obtainedMarks);
                     const hasValidScore =
-                      !row.isUnrecorded && row.obtainedMarks.trim() !== '' && !isNaN(numScore);
-                    const pct = hasValidScore ? Math.round((numScore / maxMarks) * 100) : null;
+                      !row.isUnrecorded &&
+                      row.obtainedMarks.trim() !== '' &&
+                      !isNaN(numScore) &&
+                      numScore >= 0 &&
+                      numScore <= maxMarks;
+                    const isOutOfBounds =
+                      !row.isUnrecorded &&
+                      row.obtainedMarks.trim() !== '' &&
+                      !isNaN(numScore) &&
+                      (numScore < 0 || numScore > maxMarks);
+                    const pct =
+                      hasValidScore && maxMarks > 0
+                        ? Math.min(100, Math.max(0, Math.round((numScore / maxMarks) * 100)))
+                        : null;
 
                     let badgeColor = 'bg-slate-100 text-slate-700';
                     let letterGrade = '—';
@@ -794,7 +868,11 @@ export const TeacherMarksPage: React.FC = () => {
                           </label>
                         </td>
                         <td className="py-3 px-4">
-                          {hasValidScore ? (
+                          {isOutOfBounds ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-700">
+                              Invalid (Max {maxMarks})
+                            </span>
+                          ) : hasValidScore ? (
                             <span
                               className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${badgeColor}`}
                             >
@@ -891,6 +969,14 @@ export const TeacherMarksPage: React.FC = () => {
               />
             </FormField>
           </div>
+
+          {totalAllocatedWeight + Number(newAsmtWeight || 0) > 100 && (
+            <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
+              Note: Adding <strong>{newAsmtWeight}%</strong> brings course total weightage to{' '}
+              <strong>{totalAllocatedWeight + Number(newAsmtWeight || 0)}%</strong> (exceeding 100%). Remaining capacity:{' '}
+              <strong>{remainingWeight}%</strong>.
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
             <Button

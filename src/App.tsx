@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './modules/core/AuthContext';
 import { ToastProvider } from './shared/ui/Toast';
 import { ProtectedRoute } from './shared/ui/ProtectedRoute';
@@ -54,9 +54,9 @@ const RootRedirect: React.FC = () => {
 
   if (role === 'student') {
     return <Navigate to="/student/dashboard" replace />;
-  } else if (role === 'teacher') {
+  } else if (role === 'teacher' || role === 'advisor') {
     return <Navigate to="/teacher/dashboard" replace />;
-  } else if (role === 'admin') {
+  } else if (role === 'admin' || role === 'university_admin' || role === 'dept_admin') {
     return <Navigate to="/admin/users" replace />;
   }
 
@@ -66,10 +66,15 @@ const RootRedirect: React.FC = () => {
 export default function App() {
   useEffect(() => {
     testConnection();
+    // Support legacy direct non-hash URLs (e.g. /activate?token=...) cleanly
+    if (window.location.pathname && window.location.pathname !== '/' && !window.location.hash) {
+      const targetHash = `#${window.location.pathname}${window.location.search}`;
+      window.history.replaceState(null, '', `/${targetHash}`);
+    }
   }, []);
 
   return (
-    <BrowserRouter>
+    <HashRouter>
       <AuthProvider>
         <ToastProvider>
           <Routes>
@@ -142,6 +147,6 @@ export default function App() {
           </Routes>
         </ToastProvider>
       </AuthProvider>
-    </BrowserRouter>
+    </HashRouter>
   );
 }

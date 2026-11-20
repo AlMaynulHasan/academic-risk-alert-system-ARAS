@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   GraduationCap,
@@ -20,11 +20,32 @@ import {
   HeartHandshake
 } from 'lucide-react';
 import { useAuth } from '../AuthContext';
+import { academicRecordService } from '../../../shared/services/academicRecordService';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, role, loginDemoUser } = useAuth();
   const [isLoadingRole, setIsLoadingRole] = useState<string | null>(null);
+  const [currentSemesterName, setCurrentSemesterName] = useState<string>('Active');
+
+  useEffect(() => {
+    let active = true;
+    academicRecordService
+      .getSemesters()
+      .then((sems) => {
+        if (!active || sems.length === 0) return;
+        const current = sems.find((s) => s.isCurrent) || sems[0];
+        if (current?.name) {
+          setCurrentSemesterName(current.name);
+        }
+      })
+      .catch(() => {
+        if (active) setCurrentSemesterName('Spring 2026');
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleLaunchRole = async (demoEmail: string, targetPath: string) => {
     setIsLoadingRole(demoEmail);
@@ -116,7 +137,7 @@ export const LandingPage: React.FC = () => {
             <div className="text-center max-w-3xl mx-auto">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#032517]/90 border border-[#00a651]/50 text-emerald-200 text-xs font-semibold mb-6 shadow-sm">
                 <Building2 size={14} className="text-[#00a651]" />
-                <span>Spring 2026 Academic Term • University Advisory System</span>
+                <span>{currentSemesterName} Academic Term • University Advisory System</span>
               </div>
 
               <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">

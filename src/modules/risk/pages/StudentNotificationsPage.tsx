@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Bell,
   AlertTriangle,
@@ -25,8 +26,9 @@ import {
   MONTHLY_ALERT_LIMIT,
 } from '../../../shared/services/alertService';
 import { riskService, CurrentRiskStatus, RecommendationItem } from '../../../shared/services/riskService';
-import { AlertDelivery, Notification } from '../../../shared/types';
-import { formatDhakaDateTime } from '../../../shared/utils/date';
+import { academicRecordService } from '../../../shared/services/academicRecordService';
+import { AlertDelivery, Notification, Deadline } from '../../../shared/types';
+import { formatDhakaDateTime, formatDhakaShortDate } from '../../../shared/utils/date';
 
 type TabType = 'all' | 'alerts' | 'deadlines' | 'recommendations' | 'history';
 
@@ -37,6 +39,7 @@ export const StudentNotificationsPage: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [courseDeadlines, setCourseDeadlines] = useState<Deadline[]>([]);
   const [alerts, setAlerts] = useState<AlertDelivery[]>([]);
   const [riskStatus, setRiskStatus] = useState<CurrentRiskStatus | null>(null);
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>([]);
@@ -55,12 +58,13 @@ export const StudentNotificationsPage: React.FC = () => {
     if (!isSilent) setLoading(true);
 
     try {
-      const [notifs, alertList, currentRisk, recs, quotaStatus] = await Promise.all([
+      const [notifs, alertList, currentRisk, recs, quotaStatus, deadlinesList] = await Promise.all([
         notificationService.listNotifications(user.id),
         alertService.listAlerts(user.id),
         riskService.getCurrentRisk(user.id),
         riskService.getRecommendations(user.id),
         alertService.getMonthlyQuotaStatus(user.id),
+        academicRecordService.getDeadlines(user.id),
       ]);
 
       setNotifications(notifs);
@@ -68,6 +72,7 @@ export const StudentNotificationsPage: React.FC = () => {
       setRiskStatus(currentRisk);
       setRecommendations(recs);
       setQuota(quotaStatus);
+      setCourseDeadlines(deadlinesList);
     } catch (err) {
       console.error('Error loading notification center data:', err);
     } finally {
@@ -103,10 +108,11 @@ export const StudentNotificationsPage: React.FC = () => {
     try {
       const count = await notificationService.dispatchDeadlineReminders(user.id);
       await loadData(true);
+      setActiveTab('deadlines');
       setActionMessage(
         count > 0
-          ? `Dispatched ${count} deadline reminder(s) for upcoming assignments.`
-          : 'All deadline reminders for today are already up-to-date.'
+          ? `Dispatched ${count} deadline reminder(s) for upcoming deliverables due within 72 hours.`
+          : `Showing ${courseDeadlines.length} active term deadline(s). 72-hour urgent reminders are up-to-date.`
       );
     } catch (err) {
       console.error('Dispatch deadlines error:', err);
@@ -161,7 +167,7 @@ export const StudentNotificationsPage: React.FC = () => {
   // Filtered views
   const unreadCount = notifications.filter((n) => !n.isRead).length;
   const deadlineNotifs = notifications.filter((n) => n.category === 'assignment');
-  const riskNotifs = notifications.filter((n) => n.category === 'risk_alert');
+  const deadlinesTabCount = courseDeadlines.length > 0 ? courseDeadlines.length : deadlineNotifs.length;
   const pendingAlerts = alerts.filter((a) => a.status !== 'acknowledged');
 
   return (
@@ -238,7 +244,7 @@ export const StudentNotificationsPage: React.FC = () => {
               {riskStatus && <RiskBadge level={riskStatus.riskLevel} size="sm" />}
             </div>
             <div className="text-2xl font-bold tracking-tight text-slate-900 mt-1">
-              {riskStatus?.score !== null && riskStatus?.score !== undefined ? `${riskStatus.score} / 100` : 'Sufficient Data Pending'}
+              {riskStatus?.score !== null && riskStatus?.score !== undefined ? `${Math.round(riskStatus.score)} / 100` : 'Sufficient Data Pending'}
             </div>
             <p className="text-xs text-slate-600 mt-2 line-clamp-2">
               {riskStatus?.reasons && riskStatus.reasons.length > 0
@@ -321,7 +327,7 @@ export const StudentNotificationsPage: React.FC = () => {
             }`}
           >
             <Clock className="w-4 h-4 text-indigo-500" />
-            Deadlines ({deadlineNotifs.length})
+            Deadlines ({deadlinesTabCount})
           </button>
 
           <button
@@ -428,12 +434,12 @@ export const StudentNotificationsPage: React.FC = () => {
                           </Button>
                         )}
                         {n.link && (
-                          <a
-                            href={n.link}
+                          <Link
+                            to={n.link.startsWith('/') ? n.link : `/${n.link}`}
                             className="text-xs text-blue-600 font-medium hover:underline flex items-center gap-1"
                           >
                             View <ArrowRight className="w-3 h-3" />
-                          </a>
+                          </Link>
                         )}
                       </div>
                     </div>
@@ -512,38 +518,71 @@ export const StudentNotificationsPage: React.FC = () => {
 
           {/* TAB 3: DEADLINES */}
           {activeTab === 'deadlines' && (
-            <div className="space-y-3">
-              {deadlineNotifs.length === 0 ? (
+            <div className="space-y-4">
+              {deadlineNotifs.length === 0 && courseDeadlines.length === 0 ? (
                 <EmptyState
-                  title="No Imminent Deadlines"
-                  description="You have no urgent deliverables due within 72 hours. Check your enrolled courses for the full semester schedule."
+                  title="No Upcoming Deadlines"
+                  description="You have no upcoming deliverables recorded for your active enrolled courses."
                 />
               ) : (
-                deadlineNotifs.map((d) => (
-                  <Card key={d.id} className="p-4 border border-slate-200 bg-white">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-lg bg-indigo-50 text-indigo-600">
-                          <Clock className="w-5 h-5" />
+                <>
+                  {deadlineNotifs.map((d) => (
+                    <Card key={d.id} className="p-4 border border-amber-200 bg-amber-50/30">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 rounded-lg bg-amber-100 text-amber-700">
+                            <Clock className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-semibold text-slate-900">{d.title}</h4>
+                            <p className="text-xs text-slate-600 mt-0.5">{d.message}</p>
+                            <span className="text-[11px] text-slate-400 mt-1 inline-block">
+                              Urgent reminder: {formatDhakaDateTime(d.createdAt)}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="text-sm font-semibold text-slate-900">{d.title}</h4>
-                          <p className="text-xs text-slate-600 mt-0.5">{d.message}</p>
-                          <span className="text-[11px] text-slate-400 mt-1 inline-block">
-                            Reminder logged: {formatDhakaDateTime(d.createdAt)}
-                          </span>
-                        </div>
-                      </div>
 
-                      <a
-                        href="/student/courses"
-                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
-                      >
-                        View Deliverable <ArrowRight className="w-3.5 h-3.5" />
-                      </a>
-                    </div>
-                  </Card>
-                ))
+                        <Link
+                          to="/student/courses"
+                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 shrink-0"
+                        >
+                          View Course <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    </Card>
+                  ))}
+
+                  {courseDeadlines.map((dl) => (
+                    <Card key={dl.id} className="p-4 border border-slate-200 bg-white">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 rounded-lg bg-indigo-50 text-indigo-600">
+                            <Calendar className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-200">
+                                {dl.type}
+                              </span>
+                              <h4 className="text-sm font-semibold text-slate-900">{dl.title}</h4>
+                            </div>
+                            <p className="text-xs text-slate-600 mt-0.5">{dl.description}</p>
+                            <span className="text-[11px] text-slate-500 mt-1 inline-block font-mono">
+                              Due: {formatDhakaShortDate(dl.dueDate, true)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <Link
+                          to="/student/courses"
+                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 shrink-0"
+                        >
+                          View Deliverable <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    </Card>
+                  ))}
+                </>
               )}
             </div>
           )}
@@ -590,12 +629,23 @@ export const StudentNotificationsPage: React.FC = () => {
 
                     <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
                       <span className="text-[11px] text-slate-400">Deterministic Guidance</span>
-                      <a
-                        href="/student/attendance"
+                      <Link
+                        to={
+                          rec.category === 'marks'
+                            ? '/student/marks'
+                            : rec.category === 'advising'
+                            ? '/student/performance'
+                            : '/student/attendance'
+                        }
                         className="text-xs text-blue-600 font-medium hover:underline flex items-center gap-1"
                       >
-                        Action Record <ArrowRight className="w-3 h-3" />
-                      </a>
+                        {rec.category === 'marks'
+                          ? 'Review Marks'
+                          : rec.category === 'advising'
+                          ? 'View Performance'
+                          : 'Review Attendance'}{' '}
+                        <ArrowRight className="w-3 h-3" />
+                      </Link>
                     </div>
                   </Card>
                 ))}

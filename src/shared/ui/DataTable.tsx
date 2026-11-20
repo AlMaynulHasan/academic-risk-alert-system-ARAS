@@ -154,7 +154,7 @@ export function DataTable<T>({
                     {columns.map((col) => {
                       const alignClass =
                         col.align === 'right'
-                          ? 'text-right tabular-nums'
+                          ? 'text-right tabular-nums whitespace-nowrap'
                           : col.align === 'center'
                           ? 'text-center'
                           : 'text-left';

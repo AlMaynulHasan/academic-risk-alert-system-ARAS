@@ -36,6 +36,7 @@ import { CreateDepartmentModal } from '../components/CreateDepartmentModal';
 import { CreateTeacherModal } from '../components/CreateTeacherModal';
 import { AssignCourseTeacherModal } from '../components/AssignCourseTeacherModal';
 import { seedSyntheticDatabase } from '../../../shared/firebase/seed';
+import { formatDhakaShortDate } from '../../../shared/utils/date';
 import {
   Users,
   BookOpen,
@@ -210,7 +211,7 @@ export const AdminUsersPage: React.FC = () => {
   };
 
   const handleCopyLink = (inv: StudentInvitation) => {
-    const link = `${window.location.origin}/activate?token=${inv.token}`;
+    const link = `${window.location.origin}/#/activate?token=${inv.token}`;
     navigator.clipboard.writeText(link);
     setCopiedTokenId(inv.id);
     showToast(`Activation link copied for ${inv.officialStudentId}!`, 'info');
@@ -372,13 +373,11 @@ export const AdminUsersPage: React.FC = () => {
     }
   });
 
+  // Course Teachers: strictly faculty with 'teacher' role (never admins)
+  const courseTeachersList = usersList.filter((u) => u.role === 'teacher');
+  // Faculty Advisors: teachers or dedicated advisors (never admins)
   const teachersList = usersList.filter(
-    (u) =>
-      u.role === 'teacher' ||
-      u.role === 'admin' ||
-      u.role === 'university_admin' ||
-      u.role === 'dept_admin' ||
-      u.role === 'advisor'
+    (u) => u.role === 'teacher' || u.role === 'advisor'
   );
 
   const isDeptAdmin = user?.role === 'dept_admin';
@@ -704,7 +703,7 @@ export const AdminUsersPage: React.FC = () => {
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-slate-400 font-mono text-[10px]">
-                          {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
+                          {u.createdAt ? formatDhakaShortDate(u.createdAt, true) : '—'}
                         </td>
                         <td className="py-2.5 px-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
@@ -1012,7 +1011,9 @@ export const AdminUsersPage: React.FC = () => {
                     {scopedOfferings.map((off) => {
                       const sem = semesters.find((s) => s.id === off.semesterId);
                       const crs = courses.find((c) => c.id === off.courseId);
-                      const assignedTeachers = usersList.filter((u) => off.teacherIds?.includes(u.id));
+                      const assignedTeachers = usersList.filter(
+                        (u) => u.role === 'teacher' && off.teacherIds?.includes(u.id)
+                      );
                       return (
                         <tr key={off.id} className="hover:bg-slate-50/50">
                           <td className="py-2.5 px-3">
@@ -1134,7 +1135,7 @@ export const AdminUsersPage: React.FC = () => {
                           {deptCourses.length} catalog course(s)
                         </td>
                         <td className="py-2.5 px-3 text-2xs text-slate-500">
-                          {new Date(dept.createdAt).toLocaleDateString()}
+                          {formatDhakaShortDate(dept.createdAt, true)}
                         </td>
                       </tr>
                     );
@@ -1712,7 +1713,7 @@ export const AdminUsersPage: React.FC = () => {
           onClose={() => setIsOfferingModalOpen(false)}
           courses={courses.filter((c) => c.isActive !== false)}
           semesters={semesters}
-          teachers={teachersList}
+          teachers={courseTeachersList}
           onCreated={() => loadAllAdminData()}
         />
       )}
@@ -1745,7 +1746,7 @@ export const AdminUsersPage: React.FC = () => {
             setSelectedOfferingForTeacher(null);
           }}
           offering={selectedOfferingForTeacher}
-          teachers={teachersList}
+          teachers={courseTeachersList}
           onSaved={() => loadAllAdminData()}
         />
       )}

@@ -22,6 +22,7 @@ import { EmptyState } from '../../../shared/ui/EmptyState';
 import { ExportReportModal } from '../../../shared/ui/ExportReportModal';
 import { AcademicReportData } from '../../../shared/services/exportReportService';
 import { PROVISIONAL_ATTENDANCE_THRESHOLD } from '../../../shared/constants';
+import { formatDhakaShortDate } from '../../../shared/utils/date';
 import {
   TrendingUp,
   Calendar,
@@ -36,6 +37,7 @@ export const StudentPerformancePage: React.FC = () => {
   const { user, profile } = useAuth();
 
   const [loading, setLoading] = useState(true);
+  const [currentSemesterName, setCurrentSemesterName] = useState<string>('Spring 2026');
   const [courses, setCourses] = useState<EnrollmentSummary[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState<string>('');
   const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
@@ -50,18 +52,35 @@ export const StudentPerformancePage: React.FC = () => {
 
   useEffect(() => {
     if (!user?.id) return;
-    setLoading(true);
+    let active = true;
 
-    const studentId = user.id;
+    const loadPerformance = async () => {
+      setLoading(true);
+      const studentId = user.id;
 
-    Promise.allSettled([
-      academicRecordService.getEnrollments(studentId, '2026-spring'),
-      academicRecordService.getMarks(studentId),
-      academicRecordService.getAttendance(studentId),
-      academicRecordService.getDeadlines(studentId),
-      riskService.getRecommendations(studentId),
-      riskService.getCurrentRisk(studentId),
-    ]).then(([enrsRes, marksRes, attRes, ddlRes, recRes, riskRes]) => {
+      let activeSemId: string | undefined;
+      try {
+        const sems = await academicRecordService.getSemesters();
+        const currentSem = sems.find((s) => s.isCurrent) || sems[0];
+        if (currentSem) {
+          activeSemId = currentSem.id;
+          if (active) setCurrentSemesterName(currentSem.name);
+        }
+      } catch {
+        // Fallback to default semester
+      }
+
+      const [enrsRes, marksRes, attRes, ddlRes, recRes, riskRes] = await Promise.allSettled([
+        academicRecordService.getEnrollments(studentId, activeSemId),
+        academicRecordService.getMarks(studentId),
+        academicRecordService.getAttendance(studentId),
+        academicRecordService.getDeadlines(studentId),
+        riskService.getRecommendations(studentId),
+        riskService.getCurrentRisk(studentId),
+      ]);
+
+      if (!active) return;
+
       if (enrsRes.status === 'fulfilled') {
         const enrs = enrsRes.value;
         setCourses(enrs);
@@ -99,7 +118,12 @@ export const StudentPerformancePage: React.FC = () => {
       }
 
       setLoading(false);
-    });
+    };
+
+    loadPerformance();
+    return () => {
+      active = false;
+    };
   }, [user?.id]);
 
   // Compute marks trend using unit-tested pure function
@@ -114,7 +138,10 @@ export const StudentPerformancePage: React.FC = () => {
       };
     }
 
-    const courseAssessments = allAssessments.filter((a) => a.courseId === selectedCourseId);
+    const courseAssessments =
+      selectedCourseId === 'all'
+        ? allAssessments
+        : allAssessments.filter((a) => a.courseId === selectedCourseId);
     const courseMarks = allMarks.filter((m) =>
       courseAssessments.some((a) => a.id === m.assessmentId)
     );
@@ -124,13 +151,19 @@ export const StudentPerformancePage: React.FC = () => {
 
   // Compute attendance trend using unit-tested pure function
   const attendanceTrend: AttendanceTrendPoint[] = useMemo(() => {
-    const records = selectedCourseId
-      ? allAttendance.filter((a) => a.courseId === selectedCourseId)
-      : allAttendance;
+    const records =
+      selectedCourseId && selectedCourseId !== 'all'
+        ? allAttendance.filter((a) => a.courseId === selectedCourseId)
+        : allAttendance;
     return computeAttendanceTrend(records);
   }, [selectedCourseId, allAttendance]);
 
   const activeCourse = courses.find((c) => c.courseId === selectedCourseId);
+
+  const scopedDeadlines = useMemo(() => {
+    if (!selectedCourseId || selectedCourseId === 'all') return deadlines;
+    return deadlines.filter((d) => d.courseId === selectedCourseId);
+  }, [deadlines, selectedCourseId]);
 
   // Compile full Academic Report Data for PDF and CSV documentation export
   const exportReportData: AcademicReportData = useMemo(() => {
@@ -214,7 +247,7 @@ export const StudentPerformancePage: React.FC = () => {
         section: profile?.section,
         level: profile?.level,
       },
-      semester: 'Spring 2026',
+      semester: currentSemesterName,
       generatedAt: new Date().toISOString(),
       kpis: {
         attendancePercentage,
@@ -244,7 +277,7 @@ export const StudentPerformancePage: React.FC = () => {
         status: att.status,
       })),
     };
-  }, [user, profile, courses, allAssessments, allMarks, allAttendance, riskStatus]);
+  }, [user, profile, courses, allAssessments, allMarks, allAttendance, riskStatus, currentSemesterName]);
 
   return (
     <div className="space-y-6">
@@ -269,8 +302,9 @@ export const StudentPerformancePage: React.FC = () => {
               <Select
                 value={selectedCourseId}
                 onChange={(e) => setSelectedCourseId(e.target.value)}
-                className="text-xs py-1.5 h-8 font-medium max-w-48"
+                className="text-xs py-1.5 h-8 font-medium max-w-52"
               >
+                <option value="all">All Enrolled Courses</option>
                 {courses.map((c) => (
                   <option key={c.courseId} value={c.courseId}>
                     {c.courseCode} - {c.courseTitle}
@@ -310,15 +344,23 @@ export const StudentPerformancePage: React.FC = () => {
               value={
                 attendanceTrend.length > 0
                   ? `${attendanceTrend[attendanceTrend.length - 1].cumulativeRate}%`
-                  : '100%'
+                  : 'No sessions'
               }
-              subtext={`Recorded across ${attendanceTrend.length} class sessions`}
+              subtext={
+                attendanceTrend.length > 0
+                  ? `Recorded across ${attendanceTrend.length} class session(s)`
+                  : '0 class sessions recorded'
+              }
               icon={<Calendar size={20} className="text-blue-600" />}
             />
             <StatCard
               label="Upcoming Deadlines"
-              value={deadlines.length}
-              subtext="Pending deliverables this term"
+              value={scopedDeadlines.length}
+              subtext={
+                activeCourse
+                  ? `For ${activeCourse.courseCode} (${deadlines.length} total term)`
+                  : 'Pending deliverables this term'
+              }
               icon={<Clock size={20} className="text-blue-600" />}
             />
           </div>
@@ -327,7 +369,7 @@ export const StudentPerformancePage: React.FC = () => {
             {/* Chart 1: Course Marks Evaluation Trend */}
             <Card>
               <CardHeader
-                title={`Marks Trend: ${activeCourse ? activeCourse.courseCode : 'Course'}`}
+                title={`Marks Trend: ${activeCourse ? activeCourse.courseCode : 'All Courses'}`}
                 subtitle="Scores computed as percentage of maximum evaluation marks"
               />
 
@@ -342,11 +384,11 @@ export const StudentPerformancePage: React.FC = () => {
                   <div className="space-y-3 pt-2">
                     {coursePerformance.trend.map((pt) => (
                       <div key={pt.assessmentId} className="space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-semibold text-slate-800">
+                        <div className="flex items-center justify-between gap-2 text-xs min-w-0">
+                          <span className="font-semibold text-slate-800 truncate min-w-0">
                             {pt.title} ({pt.type})
                           </span>
-                          <span className="tabular-nums font-mono font-bold text-slate-700">
+                          <span className="tabular-nums font-mono font-bold text-slate-700 shrink-0">
                             {pt.percentage !== null ? `${pt.percentage}% (${pt.obtainedMarks}/${pt.maxMarks})` : 'Not recorded'}
                           </span>
                         </div>
@@ -393,13 +435,13 @@ export const StudentPerformancePage: React.FC = () => {
               ) : (
                 <div className="space-y-4">
                   {/* Visual Progress Plot */}
-                  <div className="h-44 flex items-end gap-2 pt-6 pb-2 border-b border-slate-100 overflow-x-auto">
+                  <div className="h-48 flex items-end gap-2 pt-9 pb-2 border-b border-slate-100 overflow-x-auto">
                     {attendanceTrend.map((pt, idx) => {
                       const heightPct = Math.max(10, Math.min(100, pt.cumulativeRate));
                       const isLow = pt.cumulativeRate < PROVISIONAL_ATTENDANCE_THRESHOLD;
 
                       return (
-                        <div key={idx} className="flex-1 min-w-[32px] flex flex-col items-center gap-1 group">
+                        <div key={idx} className="flex-1 min-w-[40px] flex flex-col items-center gap-1 group">
                           <div className="relative w-full flex items-end justify-center h-32 bg-slate-50 rounded-t">
                             <div
                               className={`w-full rounded-t transition-all ${
@@ -412,8 +454,8 @@ export const StudentPerformancePage: React.FC = () => {
                               {pt.cumulativeRate}% ({pt.status})
                             </div>
                           </div>
-                          <span className="text-[9px] text-slate-400 font-mono rotate-45 sm:rotate-0 mt-1">
-                            {pt.date.slice(5)}
+                          <span className="text-[9px] text-slate-500 font-mono whitespace-nowrap mt-1">
+                            {formatDhakaShortDate(pt.date)}
                           </span>
                         </div>
                       );
@@ -483,30 +525,34 @@ export const StudentPerformancePage: React.FC = () => {
             <Card>
               <CardHeader
                 title="Upcoming Deadlines"
-                subtitle="Active term due dates"
+                subtitle={activeCourse ? `Scoped to ${activeCourse.courseCode}` : 'Active term due dates'}
               />
-              {deadlines.length === 0 ? (
-                <p className="text-xs text-slate-500 py-4 text-center">No pending deadlines recorded.</p>
+              {scopedDeadlines.length === 0 ? (
+                <p className="text-xs text-slate-500 py-4 text-center">
+                  {activeCourse
+                    ? `No pending deadlines recorded for ${activeCourse.courseCode}.`
+                    : 'No pending deadlines recorded.'}
+                </p>
               ) : (
                 <div className="space-y-2">
-                  {deadlines.map((d) => (
+                  {scopedDeadlines.map((d) => (
                     <div
                       key={d.id}
-                      className="p-3 rounded-md border border-slate-200 bg-white flex items-center justify-between"
+                      className="p-3 rounded-md border border-slate-200 bg-white flex items-center justify-between gap-3"
                     >
-                      <div>
+                      <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-200">
+                          <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-200 shrink-0">
                             {d.type}
                           </span>
-                          <span className="text-xs font-semibold text-slate-900">{d.title}</span>
+                          <span className="text-xs font-semibold text-slate-900 truncate">{d.title}</span>
                         </div>
-                        <p className="text-[11px] text-slate-500 mt-1">{d.description}</p>
+                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{d.description}</p>
                       </div>
 
                       <div className="text-right shrink-0">
-                        <span className="font-mono text-xs font-semibold text-slate-800 tabular-nums">
-                          {new Date(d.dueDate).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })}
+                        <span className="font-mono text-xs font-semibold text-slate-800 tabular-nums whitespace-nowrap">
+                          {formatDhakaShortDate(d.dueDate)}
                         </span>
                         <p className="text-[10px] text-slate-400">Due date</p>
                       </div>

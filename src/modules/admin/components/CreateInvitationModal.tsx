@@ -230,7 +230,7 @@ export const CreateInvitationModal: React.FC<CreateInvitationModalProps> = ({
 
   const copyActivationLink = () => {
     if (!createdInvitation) return;
-    const link = `${window.location.origin}/activate?token=${createdInvitation.token}`;
+    const link = `${window.location.origin}/#/activate?token=${createdInvitation.token}`;
     navigator.clipboard.writeText(link);
     setCopiedLink(true);
     showToast('Direct activation link copied to clipboard!', 'info');
@@ -262,8 +262,8 @@ Academic Advisor: ${advisorName}
 
 ${wasInstantActivated ? `ACCOUNT STATUS:   ACTIVE & READY TO LOGIN
 LOGIN PASSWORD:   ${savedPassword}
-LOGIN URL:        ${window.location.origin}/login` : `ACTIVATION CODE:  ${createdInvitation.token}
-ACTIVATION LINK:  ${window.location.origin}/activate?token=${createdInvitation.token}`}
+LOGIN URL:        ${window.location.origin}/#/login` : `ACTIVATION CODE:  ${createdInvitation.token}
+ACTIVATION LINK:  ${window.location.origin}/#/activate?token=${createdInvitation.token}`}
 
 INSTRUCTIONS:
 1. Log in at the student portal with your institutional email and password.

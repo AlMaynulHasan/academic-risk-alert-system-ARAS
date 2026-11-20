@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../core/AuthContext';
 import {
   academicRecordService,
@@ -25,6 +25,7 @@ import { CoursePerformanceBarChart, CourseScoreData } from '../components/Course
 import { AcademicHealthRadar } from '../components/AcademicHealthRadar';
 import { ExportReportModal } from '../../../shared/ui/ExportReportModal';
 import { AcademicReportData } from '../../../shared/services/exportReportService';
+import { formatDhakaShortDate } from '../../../shared/utils/date';
 import {
   BookOpen,
   CalendarCheck,
@@ -42,9 +43,11 @@ import {
 
 export const StudentDashboardPage: React.FC = () => {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [currentSemesterName, setCurrentSemesterName] = useState<string>('Spring 2026');
   const [enrollments, setEnrollments] = useState<EnrollmentSummary[]>([]);
   const [attendance, setAttendance] = useState<AttendanceSummary | null>(null);
   const [marksSummary, setMarksSummary] = useState<MarksSummary | null>(null);
@@ -54,14 +57,26 @@ export const StudentDashboardPage: React.FC = () => {
   const [riskStatus, setRiskStatus] = useState<CurrentRiskStatus | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  const loadStudentData = () => {
+  const loadStudentData = async () => {
     if (!user?.id) return;
     setLoading(true);
 
     const studentId = user.id;
 
+    let activeSemesterId: string | undefined;
+    try {
+      const sems = await academicRecordService.getSemesters();
+      const current = sems.find((s) => s.isCurrent) || sems[0];
+      if (current) {
+        activeSemesterId = current.id;
+        setCurrentSemesterName(current.name);
+      }
+    } catch {
+      // Fallback to default label
+    }
+
     Promise.allSettled([
-      academicRecordService.getEnrollments(studentId),
+      academicRecordService.getEnrollments(studentId, activeSemesterId),
       academicRecordService.getAttendance(studentId),
       academicRecordService.getMarks(studentId),
       academicRecordService.getDeadlines(studentId),
@@ -121,7 +136,7 @@ export const StudentDashboardPage: React.FC = () => {
 
       courseItems.forEach((item) => {
         if (item.mark && item.mark.obtainedMarks !== null && item.mark.obtainedMarks !== undefined) {
-          obtainedTotal += item.mark.obtainedMarks;
+          obtainedTotal += Math.min(item.assessment.maxMarks, Math.max(0, item.mark.obtainedMarks));
           maxTotal += item.assessment.maxMarks;
           gradedCount++;
         }
@@ -129,7 +144,7 @@ export const StudentDashboardPage: React.FC = () => {
 
       const percentage =
         gradedCount > 0 && maxTotal > 0
-          ? Math.round(((obtainedTotal / maxTotal) * 100) * 10) / 10
+          ? Math.min(100, Math.max(0, Math.round(((obtainedTotal / maxTotal) * 100) * 10) / 10))
           : null;
 
       return {
@@ -166,7 +181,7 @@ export const StudentDashboardPage: React.FC = () => {
       const obtained = item.mark ? item.mark.obtainedMarks : null;
       const pct =
         obtained !== null && item.assessment.maxMarks > 0
-          ? Math.round(((obtained / item.assessment.maxMarks) * 100) * 10) / 10
+          ? Math.min(100, Math.max(0, Math.round(((obtained / item.assessment.maxMarks) * 100) * 10) / 10))
           : null;
       return {
         courseCode: course ? course.courseCode : undefined,
@@ -190,7 +205,7 @@ export const StudentDashboardPage: React.FC = () => {
         section: profile?.section,
         level: profile?.level,
       },
-      semester: 'Spring 2026',
+      semester: currentSemesterName,
       generatedAt: new Date().toISOString(),
       kpis: {
         attendancePercentage: attendance?.percentage ?? 100,
@@ -227,7 +242,7 @@ export const StudentDashboardPage: React.FC = () => {
         status: att.status,
       })),
     };
-  }, [user, profile, enrollments, attendance, marksSummary, riskStatus, courseScores]);
+  }, [user, profile, enrollments, attendance, marksSummary, riskStatus, courseScores, currentSemesterName]);
 
   if (loading) {
     return (
@@ -307,7 +322,7 @@ export const StudentDashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Current Semester"
-          value="Spring 2026"
+          value={currentSemesterName}
           subtext={`${enrollments.length} Registered Courses`}
           icon={<BookOpen size={18} className="text-blue-600" />}
         />
@@ -385,7 +400,7 @@ export const StudentDashboardPage: React.FC = () => {
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardHeader
-              title="Registered Courses (Spring 2026)"
+              title={`Registered Courses (${currentSemesterName})`}
               subtitle="Current term course enrollment and credit load"
               action={
                 <Link to="/student/courses">
@@ -402,7 +417,7 @@ export const StudentDashboardPage: React.FC = () => {
                 title="No Course Enrollments Found"
                 description="You are not currently enrolled in any courses for the selected semester."
                 actionText="View Course Catalog"
-                onAction={() => {}}
+                onAction={() => navigate('/student/courses')}
               />
             ) : (
               <div className="divide-y divide-slate-100">
@@ -464,7 +479,7 @@ export const StudentDashboardPage: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <span className="text-xs font-semibold text-slate-800 tabular-nums">
-                        {new Date(d.dueDate).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })}
+                        {formatDhakaShortDate(d.dueDate)}
                       </span>
                       <p className="text-[10px] text-slate-400">Due date</p>
                     </div>

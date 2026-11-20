@@ -17,6 +17,7 @@ export const StudentProfilePage: React.FC = () => {
 
   const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(authProfile);
   const [loadingProfile, setLoadingProfile] = useState(false);
+  const [currentSemesterName, setCurrentSemesterName] = useState<string>('Spring 2026');
 
   // Password Change form state (Exclusive permitted self-service action)
   const [currentPassword, setCurrentPassword] = useState('');
@@ -27,6 +28,14 @@ export const StudentProfilePage: React.FC = () => {
   const [passError, setPassError] = useState<string | null>(null);
 
   useEffect(() => {
+    academicRecordService
+      .getSemesters()
+      .then((sems) => {
+        const current = sems.find((s) => s.isCurrent) || sems[0];
+        if (current) setCurrentSemesterName(current.name);
+      })
+      .catch(() => {});
+
     if (user?.id) {
       setLoadingProfile(true);
       academicRecordService
@@ -90,7 +99,18 @@ export const StudentProfilePage: React.FC = () => {
   const officialId = studentProfile?.studentId || user?.displayName || 'Pending Official ID';
   const officialDept = studentProfile?.department || 'Computer Science & Engineering';
   const officialBatch = studentProfile?.batch || '2026';
-  const officialLevel = studentProfile?.level || 'Level 1, Term 1';
+  const inferredLevel = (() => {
+    if (studentProfile?.level) return studentProfile.level;
+    const batchYear = parseInt(officialBatch, 10);
+    if (!isNaN(batchYear) && batchYear > 2000) {
+      const currentYearMatch = currentSemesterName.match(/\d{4}/);
+      const refYear = currentYearMatch ? parseInt(currentYearMatch[0], 10) : 2026;
+      const lvl = Math.min(4, Math.max(1, refYear - batchYear));
+      return `Level ${lvl}, Term 1`;
+    }
+    return 'Level 1, Term 1';
+  })();
+  const officialLevel = inferredLevel;
   const officialEmail = user?.email || '';
 
   // CGPA: If null or undefined (new student), display N/A - NEVER hardcode to 3.42!
@@ -165,7 +185,7 @@ export const StudentProfilePage: React.FC = () => {
             <FormField label="Current Semester Session">
               <Input
                 disabled
-                value="Spring 2026"
+                value={currentSemesterName}
                 className="bg-slate-50 text-xs text-slate-800 font-medium"
               />
             </FormField>

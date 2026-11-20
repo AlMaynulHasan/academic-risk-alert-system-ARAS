@@ -17,7 +17,10 @@ export const AcademicHealthRadar: React.FC<AcademicHealthRadarProps> = ({
   missingAssignmentsCount,
 }) => {
   const riskLevel = riskStatus?.riskLevel || 'Low';
-  const compositeScore = riskStatus?.score ?? 0;
+  const compositeScore =
+    riskStatus?.score !== null && riskStatus?.score !== undefined
+      ? Math.round(riskStatus.score)
+      : 0;
 
   // Compute 4 health scores (0-100%, where 100% is best health / lowest risk)
   // 1. Attendance health: 85%+ = 100%, 75% = 70%, 60% = 40%, <60% = 15%

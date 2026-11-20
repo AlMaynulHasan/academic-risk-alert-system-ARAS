@@ -49,8 +49,40 @@ export const MarksEntryModal: React.FC<MarksEntryModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      setAssessmentId(existingMark?.assessmentId || assessments[0]?.id || '');
+      setIsUnrecorded(existingMark ? existingMark.obtainedMarks === null : false);
+      setObtainedMarks(
+        existingMark && existingMark.obtainedMarks !== null && existingMark.obtainedMarks !== undefined
+          ? String(existingMark.obtainedMarks)
+          : ''
+      );
+      setFeedback(existingMark?.feedback || '');
+      setCorrectionReason('');
+      setError(null);
+    }
+  }, [isOpen, existingMark, assessments]);
+
   const selectedAssessment = assessments.find((a) => a.id === assessmentId);
   const maxMarks = selectedAssessment?.maxMarks || 100;
+
+  const handleMarksInputChange = (val: string) => {
+    if (val.trim() !== '') {
+      const num = Number(val);
+      if (!isNaN(num)) {
+        if (num < 0) {
+          showToast('Obtained marks cannot be negative (minimum 0).', 'warning');
+          return;
+        }
+        if (num > maxMarks) {
+          showToast(`Obtained marks (${num}) cannot exceed maximum marks (${maxMarks}).`, 'warning');
+          return;
+        }
+      }
+    }
+    setObtainedMarks(val);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,7 +239,7 @@ export const MarksEntryModal: React.FC<MarksEntryModalProps> = ({
                 max={maxMarks}
                 placeholder={`e.g., 17.5`}
                 value={obtainedMarks}
-                onChange={(e) => setObtainedMarks(e.target.value)}
+                onChange={(e) => handleMarksInputChange(e.target.value)}
                 required={!isUnrecorded}
               />
               <Award className="absolute right-3 top-2.5 text-slate-400 pointer-events-none" size={16} />

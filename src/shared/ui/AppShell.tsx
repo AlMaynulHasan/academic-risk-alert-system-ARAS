@@ -64,7 +64,11 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       ? 'Student'
       : role === 'teacher'
       ? 'Faculty Advisor'
-      : role === 'admin'
+      : role === 'advisor'
+      ? 'Academic Advisor'
+      : role === 'dept_admin'
+      ? 'Department Admin'
+      : role === 'admin' || role === 'university_admin'
       ? 'Administrator'
       : '';
 
@@ -132,7 +136,11 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         {/* Desktop Sidebar with University Green Palette (BAUST Saidpur style) */}
         <aside className="hidden md:flex flex-col w-64 bg-[#053321] border-r border-[#08452c] p-4 shrink-0 shadow-sm text-slate-200">
           <div className="mb-3 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-300/80">
-            {role === 'student' ? 'Student Workspace' : role === 'teacher' ? 'Advisor Workspace' : 'System Administration'}
+            {role === 'student'
+              ? 'Student Workspace'
+              : role === 'teacher' || role === 'advisor'
+              ? 'Advisor Workspace'
+              : 'System Administration'}
           </div>
 
           <nav className="space-y-1.5" aria-label="Sidebar Navigation">

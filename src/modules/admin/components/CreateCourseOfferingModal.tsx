@@ -29,16 +29,37 @@ export const CreateCourseOfferingModal: React.FC<CreateCourseOfferingModalProps>
   const { user } = useAuth();
   const { showToast } = useToast();
 
+  const eligibleTeachers = React.useMemo(
+    () => teachers.filter((t) => t.role === 'teacher'),
+    [teachers]
+  );
+
   const [courseId, setCourseId] = useState(courses[0]?.id || '');
   const [semesterId, setSemesterId] = useState(
     semesters.find((s) => s.isCurrent)?.id || semesters[0]?.id || ''
   );
   const [section, setSection] = useState('A');
-  const [teacherId, setTeacherId] = useState(teachers[0]?.id || '');
+  const [teacherId, setTeacherId] = useState(eligibleTeachers[0]?.id || '');
   const [capacity, setCapacity] = useState('50');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setError(null);
+      if (!courseId && courses.length > 0) {
+        setCourseId(courses[0].id);
+      }
+      const curSem = semesters.find((s) => s.isCurrent) || semesters[0];
+      if (!semesterId && curSem) {
+        setSemesterId(curSem.id);
+      }
+      if (!teacherId || !eligibleTeachers.some((t) => t.id === teacherId)) {
+        setTeacherId(eligibleTeachers[0]?.id || '');
+      }
+    }
+  }, [isOpen, courses, semesters, eligibleTeachers]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,7 +158,7 @@ export const CreateCourseOfferingModal: React.FC<CreateCourseOfferingModalProps>
           <FormField label="Assigned Course Teacher" hint="Responsible faculty">
             <Select value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
               <option value="">-- Assign Later --</option>
-              {teachers.map((t) => (
+              {eligibleTeachers.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.displayName} ({t.email})
                 </option>

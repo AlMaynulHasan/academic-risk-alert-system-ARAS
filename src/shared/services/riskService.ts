@@ -21,6 +21,7 @@ import {
 import { generateRecommendations } from '../../modules/risk/engine/recommendations';
 import { alertService } from './alertService';
 import { registerAcademicRecordListener } from './hooks';
+import { academicRecordService } from './academicRecordService';
 
 export interface CurrentRiskStatus {
   studentId: string;
@@ -68,7 +69,30 @@ export interface IRiskService {
   getRecommendations(studentId: string): Promise<RecommendationItem[]>;
 }
 
+const LOCAL_RISK_CACHE_KEY = 'aras_demo_risk_assessments';
+
 export class RiskService implements IRiskService {
+  private getLocalRiskCache(): Record<string, CurrentRiskStatus> {
+    try {
+      if (typeof localStorage === 'undefined') return {};
+      const raw = localStorage.getItem(LOCAL_RISK_CACHE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  private saveLocalRiskStatus(status: CurrentRiskStatus): void {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const cache = this.getLocalRiskCache();
+      cache[status.studentId] = status;
+      localStorage.setItem(LOCAL_RISK_CACHE_KEY, JSON.stringify(cache));
+    } catch {
+      // Ignore storage quota issues
+    }
+  }
+
   /**
    * Alias for assessStudent called by real-time sync and cross-session listeners
    */
@@ -91,36 +115,27 @@ export class RiskService implements IRiskService {
     const config = customConfig || DEFAULT_RISK_CONFIG;
 
     try {
-      // 1. Fetch current semester
+      // 1. Fetch current semester cleanly via academicRecordService
       let currentSemesterId = '2026-spring';
       try {
-        const semSnap = await getDocs(collection(db, 'semesters'));
-        semSnap.forEach((d) => {
-          const sem = d.data();
-          if (sem.isCurrent) currentSemesterId = d.id;
-        });
+        const sems = await academicRecordService.getSemesters();
+        const active = sems.find((s) => s.isCurrent) || sems[0];
+        if (active) currentSemesterId = active.id;
       } catch (err) {
         console.warn('Using default semester fallback:', err);
       }
 
-      // 2. Fetch student attendance records
-      const attSnap = await getDocs(
-        query(collection(db, 'attendanceRecords'), where('studentId', '==', studentId))
-      );
-      const attendanceRecords: any[] = [];
-      attSnap.forEach((d) => attendanceRecords.push({ id: d.id, ...d.data() }));
+      // 2-4. Fetch attendance, marks, and assessments scoped to active enrollments (with local cache merge)
+      const [attSummary, marksSummary] = await Promise.all([
+        academicRecordService.getAttendance(studentId),
+        academicRecordService.getMarks(studentId),
+      ]);
 
-      // 3. Fetch student marks
-      const marksSnap = await getDocs(
-        query(collection(db, 'marks'), where('studentId', '==', studentId))
-      );
-      const marks: any[] = [];
-      marksSnap.forEach((d) => marks.push({ id: d.id, ...d.data() }));
-
-      // 4. Fetch assessments
-      const asmtSnap = await getDocs(collection(db, 'assessments'));
-      const assessments: any[] = [];
-      asmtSnap.forEach((d) => assessments.push({ id: d.id, ...d.data() }));
+      const attendanceRecords = attSummary.records;
+      const assessments = marksSummary.items.map((item) => item.assessment);
+      const marks = marksSummary.items
+        .filter((item) => item.mark !== null)
+        .map((item) => item.mark!);
 
       // 5. Run Pure Deterministic Calculator
       const calcInput: RiskCalculationInput = {
@@ -183,6 +198,8 @@ export class RiskService implements IRiskService {
         configVersion: config.version,
       };
 
+      this.saveLocalRiskStatus(status);
+
       // 7. Trigger alert delivery if at risk
       if (result.riskLevel === 'Medium' || result.riskLevel === 'High') {
         await alertService.tryDeliverRiskAlert(studentId, status, assessmentDocId);
@@ -211,9 +228,10 @@ export class RiskService implements IRiskService {
 
   /**
    * Fetches latest risk status for a student.
-   * If none exists yet, triggers initial assessment.
+   * Re-evaluates dynamically when no scored assessment exists yet or stale initial seed is present.
    */
   async getCurrentRisk(studentId: string): Promise<CurrentRiskStatus | null> {
+    const localCached = this.getLocalRiskCache()[studentId];
     try {
       const q = query(
         collection(db, 'riskAssessments'),
@@ -222,16 +240,24 @@ export class RiskService implements IRiskService {
       const snap = await getDocs(q);
 
       if (snap.empty) {
-        // Trigger initial assessment
+        if (localCached) return localCached;
         return await this.assessStudent(studentId, 'manual_review');
       }
 
       const docs: any[] = [];
       snap.forEach((d) => docs.push({ id: d.id, ...d.data() }));
-      docs.sort((a, b) => b.computedAt.localeCompare(a.computedAt));
+      docs.sort((a, b) => (b.computedAt || '').localeCompare(a.computedAt || ''));
 
       const latest = docs[0];
-      return {
+      if (
+        latest.id?.endsWith('_init') ||
+        latest.score === undefined ||
+        latest.score === null
+      ) {
+        return await this.assessStudent(studentId, 'manual_review');
+      }
+
+      const firestoreStatus: CurrentRiskStatus = {
         studentId: latest.studentId,
         semesterId: latest.semesterId || '2026-spring',
         riskLevel: latest.riskLevel || 'Low',
@@ -246,9 +272,16 @@ export class RiskService implements IRiskService {
         computedAt: latest.computedAt || latest.createdAt,
         configVersion: latest.configVersion || '1.0.0',
       };
+
+      if (localCached && (localCached.computedAt || '') > (firestoreStatus.computedAt || '')) {
+        return localCached;
+      }
+
+      return firestoreStatus;
     } catch (err) {
       console.warn(`RiskService.getCurrentRisk error for ${studentId}:`, err);
-      return null;
+      if (localCached) return localCached;
+      return await this.assessStudent(studentId, 'manual_review').catch(() => null);
     }
   }
 

@@ -27,14 +27,16 @@ export const StudentMarksPage: React.FC = () => {
     if (!user?.id) return;
     setLoading(true);
 
-    academicRecordService.getEnrollments(user.id, '2026-spring').then((enrs) => {
+    academicRecordService.getSemesters().then((sems) => {
+      const currentSem = sems.find((s) => s.isCurrent) || sems[0];
+      return academicRecordService.getEnrollments(user.id, currentSem?.id);
+    }).then((enrs) => {
       setCourses(enrs);
       const targetCourse = selectedCourseId === 'all' ? undefined : selectedCourseId;
-      academicRecordService
+      return academicRecordService
         .getMarks(user.id, targetCourse)
-        .then((m) => setMarksSummary(m))
-        .finally(() => setLoading(false));
-    });
+        .then((m) => setMarksSummary(m));
+    }).finally(() => setLoading(false));
   }, [user?.id, selectedCourseId]);
 
   const courseMap = useMemo(() => {
@@ -44,6 +46,31 @@ export const StudentMarksPage: React.FC = () => {
   }, [courses]);
 
   const items = marksSummary?.items || [];
+
+  const weightageBreakdown = useMemo(() => {
+    const targetCourses =
+      selectedCourseId === 'all'
+        ? courses
+        : courses.filter((c) => c.courseId === selectedCourseId);
+    return targetCourses.map((c) => {
+      const courseAsmts = items.filter((i) => i.assessment.courseId === c.courseId);
+      const allocatedWeight = courseAsmts.reduce(
+        (sum, i) => sum + (i.assessment.weightage || 0),
+        0
+      );
+      return {
+        courseId: c.courseId,
+        courseCode: c.courseCode,
+        allocatedWeight,
+        assessmentCount: courseAsmts.length,
+      };
+    });
+  }, [courses, items, selectedCourseId]);
+
+  const coursesWithoutAssessments = useMemo(
+    () => weightageBreakdown.filter((w) => w.assessmentCount === 0),
+    [weightageBreakdown]
+  );
 
   const tableColumns: Column<{ assessment: Assessment; mark: Mark | null }>[] = [
     {
@@ -102,7 +129,8 @@ export const StudentMarksPage: React.FC = () => {
 
         const score = row.mark.obtainedMarks;
         const max = row.assessment.maxMarks;
-        const pct = max > 0 ? Math.round(((score / max) * 100) * 10) / 10 : 0;
+        const pct =
+          max > 0 ? Math.min(100, Math.max(0, Math.round(((score / max) * 100) * 10) / 10)) : 0;
 
         return (
           <div className="text-right">
@@ -185,17 +213,49 @@ export const StudentMarksPage: React.FC = () => {
             />
           </div>
 
+          {/* Weightage Allocation & Assessment Publishing Clarity */}
+          {weightageBreakdown.length > 0 && (
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div className="flex flex-wrap items-center gap-2 text-slate-700">
+                <span className="font-semibold text-slate-900">Weightage Allocation:</span>
+                {weightageBreakdown.map((w) => (
+                  <span
+                    key={w.courseId}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border font-mono text-[11px] ${
+                      w.allocatedWeight === 100
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                        : w.assessmentCount === 0
+                        ? 'bg-slate-100 border-slate-200 text-slate-600'
+                        : 'bg-amber-50 border-amber-200 text-amber-800'
+                    }`}
+                  >
+                    <strong>{w.courseCode}:</strong> {w.allocatedWeight}% / 100%
+                  </span>
+                ))}
+              </div>
+              {coursesWithoutAssessments.length > 0 && (
+                <span className="text-[11px] text-slate-500">
+                  No evaluations published yet for{' '}
+                  <strong className="text-slate-700">
+                    {coursesWithoutAssessments.map((c) => c.courseCode).join(', ')}
+                  </strong>
+                  .
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Assessment Table */}
           <Card>
             <CardHeader
               title="Continuous Assessment Records"
-              subtitle="Evaluation results, weightages, and feedback recorded in Firestore marks collection"
+              subtitle="Evaluation results, weightages, and feedback recorded for your active semester courses"
             />
 
             {items.length === 0 ? (
               <EmptyState
-                title="No Assessments Recorded"
-                description="No assessment evaluations found for the selected course filter."
+                title="No Assessments Published Yet"
+                description="No assessment evaluations have been published yet for the selected course filter."
               />
             ) : (
               <DataTable

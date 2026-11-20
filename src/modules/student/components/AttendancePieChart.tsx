@@ -213,7 +213,7 @@ export const AttendancePieChart: React.FC<AttendancePieChartProps> = ({
             ) : (
               <div>
                 <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500 block">
-                  Cumulative
+                  Weighted Rate
                 </span>
                 <span className="text-2xl font-bold text-slate-900 tracking-tight font-mono block">
                   {total > 0 ? `${overallRate}%` : 'N/A'}
@@ -271,9 +271,9 @@ export const AttendancePieChart: React.FC<AttendancePieChartProps> = ({
             })}
           </div>
 
-          <div className="pt-1 text-[11px] text-slate-500 flex items-center justify-between">
+          <div className="pt-1 text-[11px] text-slate-500 flex flex-wrap items-center justify-between gap-1">
             <span>Total Recorded Sessions: <strong className="text-slate-800">{total}</strong></span>
-            <span>Policy: Present (100%), Late (50%)</span>
+            <span>Weighted: (Present + 0.5×Late) / Total</span>
           </div>
         </div>
       </div>
