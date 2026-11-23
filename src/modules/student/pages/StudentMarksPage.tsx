@@ -53,7 +53,11 @@ export const StudentMarksPage: React.FC = () => {
         ? courses
         : courses.filter((c) => c.courseId === selectedCourseId);
     return targetCourses.map((c) => {
-      const courseAsmts = items.filter((i) => i.assessment.courseId === c.courseId);
+      const courseAsmts = items.filter(
+        (i) =>
+          i.assessment.courseId === c.courseId &&
+          (!c.semesterId || !i.assessment.semesterId || i.assessment.semesterId === c.semesterId)
+      );
       const allocatedWeight = courseAsmts.reduce(
         (sum, i) => sum + (i.assessment.weightage || 0),
         0
@@ -222,14 +226,26 @@ export const StudentMarksPage: React.FC = () => {
                   <span
                     key={w.courseId}
                     className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border font-mono text-[11px] ${
-                      w.allocatedWeight === 100
+                      w.allocatedWeight > 100
+                        ? 'bg-red-50 border-red-200 text-red-700'
+                        : w.allocatedWeight === 100
                         ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
                         : w.assessmentCount === 0
                         ? 'bg-slate-100 border-slate-200 text-slate-600'
                         : 'bg-amber-50 border-amber-200 text-amber-800'
                     }`}
+                    title={
+                      w.allocatedWeight > 100
+                        ? `Total weightage (${w.allocatedWeight}%) exceeds 100% cap and needs instructor adjustment.`
+                        : `${w.allocatedWeight}% out of 100% total course rubric allocated`
+                    }
                   >
                     <strong>{w.courseCode}:</strong> {w.allocatedWeight}% / 100%
+                    {w.allocatedWeight > 100 && (
+                      <span className="font-sans text-[10px] font-semibold ml-1">
+                        (Exceeds 100%)
+                      </span>
+                    )}
                   </span>
                 ))}
               </div>

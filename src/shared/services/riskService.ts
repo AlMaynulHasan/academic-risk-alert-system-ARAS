@@ -257,6 +257,17 @@ export class RiskService implements IRiskService {
         return await this.assessStudent(studentId, 'manual_review');
       }
 
+      if ((latest.missingAssignmentsCount || 0) > 0) {
+        try {
+          const currentMarks = await academicRecordService.getMarks(studentId);
+          if (currentMarks.missingCount !== (latest.missingAssignmentsCount || 0)) {
+            return await this.assessStudent(studentId, 'manual_review');
+          }
+        } catch {
+          // Ignore sync probe error and use stored status
+        }
+      }
+
       const firestoreStatus: CurrentRiskStatus = {
         studentId: latest.studentId,
         semesterId: latest.semesterId || '2026-spring',

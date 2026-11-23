@@ -148,6 +148,7 @@ export function calculateRisk(
 
   const gradedPoints: Array<{ date: number; scorePct: number }> = [];
 
+  const nowMs = Date.now();
   input.assessments.forEach((asmt) => {
     const mark = marksMap.get(asmt.id);
     if (mark && mark.obtainedMarks !== null && mark.obtainedMarks !== undefined) {
@@ -162,8 +163,13 @@ export function calculateRisk(
         scorePct: pct,
       });
     } else {
-      // Missing or unrecorded mark
-      missingAssessmentsCount++;
+      // Only count as missing/unsubmitted if explicitly recorded as null or dueDate has passed
+      const dueMs = asmt.dueDate ? new Date(asmt.dueDate).getTime() : NaN;
+      const isExplicitNull = mark !== undefined && mark.obtainedMarks === null;
+      const isPastDue = isNaN(dueMs) || dueMs <= nowMs;
+      if (isExplicitNull || isPastDue) {
+        missingAssessmentsCount++;
+      }
     }
   });
 

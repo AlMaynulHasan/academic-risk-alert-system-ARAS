@@ -25,6 +25,9 @@ import {
   getDocs,
   doc,
   updateDoc,
+  setDoc,
+  query,
+  where,
 } from 'firebase/firestore';
 import { CreateCourseModal } from '../components/CreateCourseModal';
 import { CreateSemesterModal } from '../components/CreateSemesterModal';
@@ -64,7 +67,7 @@ import {
 } from 'lucide-react';
 
 export const AdminUsersPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<
@@ -246,17 +249,69 @@ export const AdminUsersPage: React.FC = () => {
     loadAllAdminData();
   }, []);
 
-  // Role modification handler
+  // Role modification handler (syncs Firestore docs by UID & email, local cache, and active session)
   const handleUpdateUserRole = async (userId: string, targetRole: UserRole) => {
     setIsUpdatingRole(true);
+    const now = new Date().toISOString();
+    const targetUser = usersList.find((u) => u.id === userId) || selectedUserToEdit;
+    const cleanEmail = targetUser?.email?.trim().toLowerCase() || '';
+
     try {
-      await updateDoc(doc(db, 'users', userId), {
-        role: targetRole,
-        updatedAt: new Date().toISOString(),
-      });
+      // 1. Upsert primary user document in Firestore
+      await setDoc(
+        doc(db, 'users', userId),
+        {
+          ...(targetUser || {}),
+          id: userId,
+          email: targetUser?.email || '',
+          role: targetRole,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+
+      // 2. Sync any duplicate/Firebase-Auth user docs with the same email so login always resolves the new role
+      if (cleanEmail) {
+        try {
+          const emailDocs = await getDocs(
+            query(collection(db, 'users'), where('email', '==', cleanEmail))
+          );
+          for (const d of emailDocs.docs) {
+            if (d.id !== userId) {
+              await updateDoc(doc(db, 'users', d.id), {
+                role: targetRole,
+                updatedAt: now,
+              });
+            }
+          }
+        } catch (syncErr) {
+          console.warn('Secondary email role sync note:', syncErr);
+        }
+
+        // 3. Update localStorage demo registered users cache so fallback login uses new role
+        try {
+          const storedDemoUsers = JSON.parse(localStorage.getItem('aras_demo_registered_users') || '{}');
+          if (storedDemoUsers[cleanEmail]?.user) {
+            storedDemoUsers[cleanEmail].user.role = targetRole;
+            storedDemoUsers[cleanEmail].user.updatedAt = now;
+            if (targetRole !== 'student') {
+              delete storedDemoUsers[cleanEmail].profile;
+            }
+            localStorage.setItem('aras_demo_registered_users', JSON.stringify(storedDemoUsers));
+          }
+        } catch {
+          // Ignore local cache write error
+        }
+      }
+
+      // 4. Refresh active AuthContext if admin updated their own account
+      if (user && (user.id === userId || (cleanEmail && user.email?.toLowerCase() === cleanEmail))) {
+        await refreshUser();
+      }
+
       showToast(`User role updated to ${targetRole}.`, 'success');
       setSelectedUserToEdit(null);
-      loadAllAdminData();
+      await loadAllAdminData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to update user role.';
       showToast(msg, 'error');
@@ -360,7 +415,15 @@ export const AdminUsersPage: React.FC = () => {
   const studentsList: User[] = [...baseStudents];
   invitations.forEach((inv) => {
     const studentUid = inv.claimedByUid || inv.id;
-    if (!studentsList.some((s) => s.id === studentUid || s.email?.toLowerCase() === inv.email?.toLowerCase())) {
+    const invEmail = (inv.email || '').toLowerCase();
+    // Do not re-add as student if an existing user with this UID/email was promoted to another role
+    const matchedUser = usersList.find(
+      (u) => u.id === studentUid || (invEmail && u.email?.toLowerCase() === invEmail)
+    );
+    if (matchedUser && matchedUser.role !== 'student') {
+      return;
+    }
+    if (!studentsList.some((s) => s.id === studentUid || (invEmail && s.email?.toLowerCase() === invEmail))) {
       studentsList.push({
         id: studentUid,
         email: inv.email,
@@ -1613,7 +1676,9 @@ export const AdminUsersPage: React.FC = () => {
               <label className="text-xs font-medium text-slate-700">Assign Institutional Role:</label>
               <Select value={newRole} onChange={(e) => setNewRole(e.target.value as UserRole)}>
                 <option value="student">Student (Advisee)</option>
-                <option value="teacher">Teacher (Faculty Advisor)</option>
+                <option value="teacher">Teacher (Course Faculty)</option>
+                <option value="advisor">Faculty Advisor</option>
+                <option value="dept_admin">Department Administrator</option>
                 <option value="admin">System Administrator</option>
               </Select>
               <p className="text-[10px] text-slate-400">

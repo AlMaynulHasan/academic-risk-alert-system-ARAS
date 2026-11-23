@@ -298,6 +298,16 @@ export class AcademicRecordService implements IAcademicRecordService {
     }
   }
 
+  private deleteLocalAssessment(assessmentId: string): void {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const list = this.getLocalAssessments().filter((a) => a.id !== assessmentId);
+      localStorage.setItem('aras_demo_assessments', JSON.stringify(list));
+    } catch (e) {
+      console.warn('Could not delete local assessment:', e);
+    }
+  }
+
   private getLocalMarks(): Mark[] {
     try {
       if (typeof localStorage === 'undefined') return [];
@@ -493,9 +503,7 @@ export class AcademicRecordService implements IAcademicRecordService {
         const activeCourseIds = new Set(
           enrollments.filter((e) => e.status !== 'dropped').map((e) => e.courseId)
         );
-        if (activeCourseIds.size > 0) {
-          records = records.filter((r) => activeCourseIds.has(r.courseId));
-        }
+        records = records.filter((r) => activeCourseIds.has(r.courseId));
       } catch (enrErr) {
         console.warn(`Could not filter attendance by enrollment for ${studentId}:`, enrErr);
       }
@@ -642,9 +650,7 @@ export class AcademicRecordService implements IAcademicRecordService {
           const activeCourseIds = new Set(
             enrollments.filter((e) => e.status !== 'dropped').map((e) => e.courseId)
           );
-          if (activeCourseIds.size > 0) {
-            assessments = assessments.filter((a) => activeCourseIds.has(a.courseId));
-          }
+          assessments = assessments.filter((a) => activeCourseIds.has(a.courseId));
         } catch (enrErr) {
           console.warn(`Could not filter marks by enrollment for ${studentId}:`, enrErr);
         }
@@ -676,6 +682,7 @@ export class AcademicRecordService implements IAcademicRecordService {
       let totalMaxMarks = 0;
       let missingCount = 0;
 
+      const nowMs = Date.now();
       const items = assessments.map((asmt) => {
         const mark = marksMap.get(asmt.id) || null;
         if (mark && mark.obtainedMarks !== null && mark.obtainedMarks !== undefined) {
@@ -683,7 +690,12 @@ export class AcademicRecordService implements IAcademicRecordService {
           totalObtained += boundedScore;
           totalMaxMarks += asmt.maxMarks;
         } else {
-          missingCount++;
+          const dueMs = asmt.dueDate ? new Date(asmt.dueDate).getTime() : NaN;
+          const isExplicitMissing = mark !== null && mark.obtainedMarks === null;
+          const isPastDue = isNaN(dueMs) || dueMs <= nowMs;
+          if (isExplicitMissing || isPastDue) {
+            missingCount++;
+          }
         }
         return { assessment: asmt, mark };
       });
@@ -1140,6 +1152,22 @@ export class AcademicRecordService implements IAcademicRecordService {
       throw new Error('VALIDATION_ERROR: dueDate is required.');
     }
 
+    // Enforce institutional cap: cumulative weightage per course+semester cannot exceed 100%
+    const existingCourseAssessments = await this.getAssessments(assessment.courseId);
+    const sameTermAssessments = existingCourseAssessments.filter(
+      (a) => !assessment.semesterId || !a.semesterId || a.semesterId === assessment.semesterId
+    );
+    const currentAllocatedWeight = sameTermAssessments.reduce(
+      (sum, a) => sum + (a.weightage || 0),
+      0
+    );
+    if (currentAllocatedWeight + assessment.weightage > 100) {
+      const remaining = Math.max(0, 100 - currentAllocatedWeight);
+      throw new Error(
+        `VALIDATION_ERROR: Total course weightage cannot exceed 100% (currently ${currentAllocatedWeight}%, remaining ${remaining}%).`
+      );
+    }
+
     const docId = `asmt_${assessment.courseId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const now = getCurrentUtcIso();
 
@@ -1186,9 +1214,35 @@ export class AcademicRecordService implements IAcademicRecordService {
     }
 
     const asmtRef = doc(db, 'assessments', assessmentId);
-    const snap = await getDoc(asmtRef);
-    if (!snap.exists()) {
+    let existingData = this.getLocalAssessments().find((a) => a.id === assessmentId);
+    try {
+      const snap = await getDoc(asmtRef);
+      if (snap.exists()) {
+        existingData = { id: snap.id, ...(snap.data() as Omit<Assessment, 'id'>) };
+      }
+    } catch {
+      // Fallback to local cache check
+    }
+
+    if (!existingData) {
       throw new Error(`NOT_FOUND: Assessment "${assessmentId}" does not exist.`);
+    }
+
+    if (updates.weightage !== undefined) {
+      const courseAssessments = await this.getAssessments(existingData.courseId);
+      const otherWeight = courseAssessments
+        .filter(
+          (a) =>
+            a.id !== assessmentId &&
+            (!existingData?.semesterId || !a.semesterId || a.semesterId === existingData.semesterId)
+        )
+        .reduce((sum, a) => sum + (a.weightage || 0), 0);
+      if (otherWeight + updates.weightage > 100) {
+        const remaining = Math.max(0, 100 - otherWeight);
+        throw new Error(
+          `VALIDATION_ERROR: Total course weightage cannot exceed 100% (other assessments use ${otherWeight}%, remaining ${remaining}%).`
+        );
+      }
     }
 
     const now = getCurrentUtcIso();
@@ -1198,11 +1252,21 @@ export class AcademicRecordService implements IAcademicRecordService {
     };
     if (updates.title) payload.title = updates.title.trim();
 
+    this.saveLocalAssessment({
+      ...existingData,
+      ...updates,
+      title: updates.title ? updates.title.trim() : existingData.title,
+      updatedAt: now,
+    });
+
     try {
       await updateDoc(asmtRef, payload);
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `assessments/${assessmentId}`);
-      throw err;
+      const isDemo = typeof localStorage !== 'undefined' && Boolean(localStorage.getItem('aras_demo_session_email'));
+      if (!isDemo && auth.currentUser) {
+        handleFirestoreError(err, OperationType.WRITE, `assessments/${assessmentId}`);
+        throw err;
+      }
     }
   }
 
@@ -1213,11 +1277,15 @@ export class AcademicRecordService implements IAcademicRecordService {
     assessmentId: string,
     actor?: { uid: string; role: 'teacher' | 'admin' }
   ): Promise<void> {
+    this.deleteLocalAssessment(assessmentId);
     try {
       await deleteDoc(doc(db, 'assessments', assessmentId));
     } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, `assessments/${assessmentId}`);
-      throw err;
+      const isDemo = typeof localStorage !== 'undefined' && Boolean(localStorage.getItem('aras_demo_session_email'));
+      if (!isDemo && auth.currentUser) {
+        handleFirestoreError(err, OperationType.DELETE, `assessments/${assessmentId}`);
+        throw err;
+      }
     }
   }
 
@@ -1982,38 +2050,8 @@ export class AcademicRecordService implements IAcademicRecordService {
       }
     }
 
-    // Auto-enroll newly activated student into active courses for their department in the current semester
-    try {
-      const allCourses = await this.getCourses(false);
-      const invDept = (inv.department || '').trim().toLowerCase();
-      const matchedCourses = allCourses.filter((c) => {
-        const cDept = (c.department || '').trim().toLowerCase();
-        return (
-          cDept === invDept ||
-          cDept.includes(invDept) ||
-          invDept.includes(cDept) ||
-          c.code.toLowerCase().startsWith(invDept)
-        );
-      });
-      const coursesToEnroll = matchedCourses.length > 0 ? matchedCourses : allCourses.slice(0, 3);
-      for (const crs of coursesToEnroll) {
-        try {
-          await this.createEnrollment(
-            {
-              studentId: studentUid,
-              courseId: crs.id,
-              semesterId: curSemId,
-              status: 'enrolled',
-            },
-            { uid: 'system', role: 'admin' }
-          );
-        } catch (enrErr) {
-          // Ignore duplicate enrollment error
-        }
-      }
-    } catch (autoEnrErr) {
-      console.warn('Auto enrollment on claim token note:', autoEnrErr);
-    }
+    // Do not auto-enroll newly activated students into arbitrary or cross-department courses.
+    // Administrators explicitly enroll students into their department & section offerings via Enrollments / + Course.
 
     return {
       invitation: { ...inv, status: 'claimed', claimedAt: now, claimedByUid: studentUid },

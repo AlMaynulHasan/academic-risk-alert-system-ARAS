@@ -195,6 +195,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (snap.exists()) {
         let data = snap.data() as User;
+        // Also check if an admin updated a user doc matched by email (e.g., pre-created/student_* doc)
+        if (fbUser.email) {
+          try {
+            const byEmailSnap = await getDocs(
+              query(collection(db, 'users'), where('email', '==', fbUser.email.toLowerCase()))
+            );
+            byEmailSnap.forEach((d) => {
+              const candidate = d.data() as User;
+              if (
+                d.id !== fbUser.uid &&
+                candidate.updatedAt &&
+                (!data.updatedAt || candidate.updatedAt > data.updatedAt)
+              ) {
+                data = { ...data, role: candidate.role, updatedAt: candidate.updatedAt };
+              }
+            });
+          } catch {
+            // Ignore secondary email lookup failure
+          }
+        }
         if (fbUser.email?.toLowerCase() === 'maynulhasan625@gmail.com' && data.role !== 'admin' && data.role !== 'university_admin') {
           data = { ...data, role: 'admin', updatedAt: getCurrentUtcIso() };
           try {
@@ -208,24 +228,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsDemoSession(false);
         localStorage.removeItem('aras_demo_session_email');
 
-        // Fetch studentProfile if student
+        // Fetch studentProfile if student, otherwise clear stale student profile
         if (data.role === 'student') {
           const profileSnap = await getDoc(doc(db, 'studentProfiles', fbUser.uid));
           if (profileSnap.exists()) {
             setProfile(profileSnap.data() as StudentProfile);
           }
+        } else {
+          setProfile(null);
         }
         return data;
       } else {
-        // Fallback for new user document: Auto-admin for app owner, else student
+        // Check if an admin already created/updated a users record for this email
+        let existingByEmail: User | null = null;
+        if (fbUser.email) {
+          try {
+            const byEmailSnap = await getDocs(
+              query(collection(db, 'users'), where('email', '==', fbUser.email.toLowerCase()))
+            );
+            if (!byEmailSnap.empty) {
+              existingByEmail = byEmailSnap.docs[0].data() as User;
+            }
+          } catch {
+            // Ignore lookup failure
+          }
+        }
+
         const isAdminUser = fbUser.email?.toLowerCase() === 'maynulhasan625@gmail.com' || fbUser.email?.toLowerCase().includes('admin');
-        const defaultRole: UserRole = isAdminUser ? 'admin' : 'student';
+        const defaultRole: UserRole = existingByEmail?.role || (isAdminUser ? 'admin' : 'student');
         const newUser: User = {
           id: fbUser.uid,
           email: fbUser.email || '',
-          displayName: fbUser.displayName || (isAdminUser ? 'Admin User' : 'Student User'),
+          displayName: existingByEmail?.displayName || fbUser.displayName || (isAdminUser ? 'Admin User' : 'Student User'),
           role: defaultRole,
-          createdAt: getCurrentUtcIso(),
+          departmentId: existingByEmail?.departmentId,
+          assignedDepartment: existingByEmail?.assignedDepartment,
+          createdAt: existingByEmail?.createdAt || getCurrentUtcIso(),
           updatedAt: getCurrentUtcIso(),
         };
         try {
@@ -235,6 +273,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         setUser(newUser);
         setRole(defaultRole);
+        if (defaultRole !== 'student') {
+          setProfile(null);
+        }
         setIsDemoSession(false);
         return newUser;
       }
@@ -262,14 +303,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const entry = customUsers[storedDemoEmail];
             setUser(entry.user);
             setRole(entry.user.role);
-            if (entry.profile) {
+            if (entry.user.role === 'student' && entry.profile) {
               setProfile(entry.profile);
+            } else {
+              setProfile(null);
             }
             setIsDemoSession(true);
           }
         } catch {
           // Ignore
         }
+
+        // Always sync latest role from Firestore so Admin role promotions apply on reload
+        getDocs(query(collection(db, 'users'), where('email', '==', storedDemoEmail.toLowerCase())))
+          .then((snap) => {
+            if (!snap.empty) {
+              const d = snap.docs[0];
+              const fsUser = { id: d.id, ...(d.data() as Omit<User, 'id'>) };
+              setUser(fsUser);
+              setRole(fsUser.role);
+              if (fsUser.role !== 'student') {
+                setProfile(null);
+              }
+              setIsDemoSession(true);
+              try {
+                const customUsers = JSON.parse(localStorage.getItem('aras_demo_registered_users') || '{}');
+                if (customUsers[storedDemoEmail]) {
+                  customUsers[storedDemoEmail].user = { ...customUsers[storedDemoEmail].user, ...fsUser };
+                  localStorage.setItem('aras_demo_registered_users', JSON.stringify(customUsers));
+                }
+              } catch {
+                // Ignore
+              }
+            }
+          })
+          .catch(() => {});
       }
     }
 
@@ -301,20 +369,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
 
-      // 1. Check custom registered teachers and users from Admin
+      // 1. Check Firestore directly first so admin role promotions always override cached local roles
+      let firestoreMatchedUser: User | null = null;
+      let firestoreMatchedPasswordHash: string | undefined;
+      try {
+        const usersSnap = await getDocs(
+          query(collection(db, 'users'), where('email', '==', cleanEmail))
+        );
+        if (!usersSnap.empty) {
+          const foundDoc = usersSnap.docs[0];
+          firestoreMatchedUser = { id: foundDoc.id, ...(foundDoc.data() as Omit<User, 'id'>) };
+          firestoreMatchedPasswordHash = (foundDoc.data() as { passwordHash?: string }).passwordHash;
+        }
+      } catch (firestoreErr) {
+        console.warn('Firestore fallback login check error:', firestoreErr);
+      }
+
+      // 2. Check custom registered teachers/students/users from Admin
       try {
         const customUsers = JSON.parse(localStorage.getItem('aras_demo_registered_users') || '{}');
         if (customUsers[cleanEmail]) {
           const registered = customUsers[cleanEmail];
-          if (registered.password === pass || !registered.password) {
-            setUser(registered.user);
-            setRole(registered.user.role);
-            if (registered.profile) {
+          const expectedPass = firestoreMatchedPasswordHash || registered.password;
+          if (expectedPass === pass || !expectedPass) {
+            const effectiveUser: User = firestoreMatchedUser
+              ? { ...registered.user, ...firestoreMatchedUser }
+              : registered.user;
+            if (firestoreMatchedUser) {
+              customUsers[cleanEmail].user = effectiveUser;
+              localStorage.setItem('aras_demo_registered_users', JSON.stringify(customUsers));
+            }
+            setUser(effectiveUser);
+            setRole(effectiveUser.role);
+            if (effectiveUser.role === 'student' && registered.profile) {
               setProfile(registered.profile);
+            } else {
+              setProfile(null);
             }
             setIsDemoSession(true);
             localStorage.setItem('aras_demo_session_email', cleanEmail);
-            return registered.user.role;
+            return effectiveUser.role;
           } else {
             throw new Error('Invalid password for this account.');
           }
@@ -325,25 +419,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // 2. Check Firestore directly for user document
-      try {
-        const usersSnap = await getDocs(
-          query(collection(db, 'users'), where('email', '==', cleanEmail))
-        );
-        if (!usersSnap.empty) {
-          const foundDoc = usersSnap.docs[0];
-          const foundUser = { id: foundDoc.id, ...(foundDoc.data() as Omit<User, 'id'>) };
-          const storedHash = (foundDoc.data() as any).passwordHash;
-          if (!storedHash || storedHash === pass || pass.length >= 6) {
-            setUser(foundUser);
-            setRole(foundUser.role);
-            setIsDemoSession(true);
-            localStorage.setItem('aras_demo_session_email', cleanEmail);
-            return foundUser.role;
+      // 3. Direct Firestore user login fallback (when local cache absent)
+      if (firestoreMatchedUser) {
+        if (!firestoreMatchedPasswordHash || firestoreMatchedPasswordHash === pass) {
+          setUser(firestoreMatchedUser);
+          setRole(firestoreMatchedUser.role);
+          if (firestoreMatchedUser.role !== 'student') {
+            setProfile(null);
           }
+          setIsDemoSession(true);
+          localStorage.setItem('aras_demo_session_email', cleanEmail);
+          return firestoreMatchedUser.role;
+        } else {
+          throw new Error('Invalid password for this account.');
         }
-      } catch (firestoreErr) {
-        console.warn('Firestore fallback login check error:', firestoreErr);
       }
 
       // 3. Check synthetic demo users
@@ -659,6 +748,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshUser = async () => {
     if (auth.currentUser) {
       await fetchUserProfile(auth.currentUser);
+      return;
+    }
+    const storedEmail = localStorage.getItem('aras_demo_session_email') || user?.email;
+    if (storedEmail) {
+      try {
+        const snap = await getDocs(
+          query(collection(db, 'users'), where('email', '==', storedEmail.toLowerCase()))
+        );
+        if (!snap.empty) {
+          const d = snap.docs[0];
+          const fsUser = { id: d.id, ...(d.data() as Omit<User, 'id'>) };
+          setUser(fsUser);
+          setRole(fsUser.role);
+          if (fsUser.role !== 'student') {
+            setProfile(null);
+          }
+        }
+      } catch {
+        // Ignore refresh fallback failure
+      }
     }
   };
 

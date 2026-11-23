@@ -15,7 +15,8 @@ import {
   Calendar,
   Layers,
   ArrowRight,
-  ShieldAlert
+  ShieldAlert,
+  Trash2
 } from 'lucide-react';
 import { useAuth } from '../../core/AuthContext';
 import { useToast } from '../../../shared/ui/Toast';
@@ -144,7 +145,10 @@ export const TeacherMarksPage: React.FC = () => {
       if (!offering) return;
 
       try {
-        const asmtList = await academicRecordService.getAssessments(offering.courseId);
+        const allAsmtList = await academicRecordService.getAssessments(offering.courseId);
+        const asmtList = allAsmtList.filter(
+          (a) => !offering.semesterId || !a.semesterId || a.semesterId === offering.semesterId
+        );
         setAssessments(asmtList);
 
         if (asmtList.length > 0) {
@@ -493,6 +497,19 @@ export const TeacherMarksPage: React.FC = () => {
     const offering = offerings.find((o) => o.id === selectedOfferingId);
     if (!offering) return;
 
+    const weightNum = Number(newAsmtWeight);
+    if (isNaN(weightNum) || weightNum <= 0 || weightNum > 100) {
+      showToast('Weightage must be between 1% and 100%.', 'error');
+      return;
+    }
+    if (totalAllocatedWeight + weightNum > 100) {
+      showToast(
+        `Cannot exceed 100% total course weightage (currently ${totalAllocatedWeight}%, remaining ${remainingWeight}%).`,
+        'error'
+      );
+      return;
+    }
+
     setIsCreatingAsmt(true);
     try {
       const newId = await academicRecordService.createAssessment(
@@ -502,14 +519,17 @@ export const TeacherMarksPage: React.FC = () => {
           title: newAsmtTitle.trim(),
           type: newAsmtType,
           maxMarks: Number(newAsmtMaxMarks),
-          weightage: Number(newAsmtWeight),
-          dueDate: new Date().toISOString().split('T')[0],
+          weightage: weightNum,
+          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           createdBy: user?.id || 'teacher',
         },
         user ? { uid: user.id, role: 'teacher' } : undefined
       );
 
-      const updatedAsmts = await academicRecordService.getAssessments(offering.courseId);
+      const allUpdated = await academicRecordService.getAssessments(offering.courseId);
+      const updatedAsmts = allUpdated.filter(
+        (a) => !offering.semesterId || !a.semesterId || a.semesterId === offering.semesterId
+      );
       setAssessments(updatedAsmts);
       setSelectedAssessmentId(newId);
       setIsNewAssessmentModalOpen(false);
@@ -520,6 +540,30 @@ export const TeacherMarksPage: React.FC = () => {
       showToast(msg, 'error');
     } finally {
       setIsCreatingAsmt(false);
+    }
+  };
+
+  const handleDeleteAssessment = async (asmt: Assessment) => {
+    if (!confirm(`Delete assessment "${asmt.title}" (${asmt.weightage}% weightage)?`)) return;
+    const offering = offerings.find((o) => o.id === selectedOfferingId);
+    try {
+      await academicRecordService.deleteAssessment(
+        asmt.id,
+        user ? { uid: user.id, role: 'teacher' } : undefined
+      );
+      const remainingList = assessments.filter((a) => a.id !== asmt.id);
+      setAssessments(remainingList);
+      setSelectedAssessmentId(remainingList[0]?.id || '');
+      if (offering) {
+        setSearchParams({
+          offeringId: offering.id,
+          ...(remainingList[0]?.id ? { assessmentId: remainingList[0].id } : {}),
+        });
+      }
+      showToast(`Deleted assessment "${asmt.title}".`, 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete assessment.';
+      showToast(msg, 'error');
     }
   };
 
@@ -639,23 +683,35 @@ export const TeacherMarksPage: React.FC = () => {
               <label className="block text-xs font-medium text-slate-700 mb-1.5">
                 Select Assessment Task
               </label>
-              <Select
-                value={selectedAssessmentId}
-                onChange={(e) => {
-                  setSelectedAssessmentId(e.target.value);
-                  setSearchParams({ offeringId: selectedOfferingId, assessmentId: e.target.value });
-                }}
-                disabled={loading || assessments.length === 0}
-              >
-                {assessments.length === 0 && (
-                  <option value="">No assessments created yet (Click New Assessment)</option>
+              <div className="flex items-center gap-1.5">
+                <Select
+                  value={selectedAssessmentId}
+                  onChange={(e) => {
+                    setSelectedAssessmentId(e.target.value);
+                    setSearchParams({ offeringId: selectedOfferingId, assessmentId: e.target.value });
+                  }}
+                  disabled={loading || assessments.length === 0}
+                >
+                  {assessments.length === 0 && (
+                    <option value="">No assessments created yet (Click New Assessment)</option>
+                  )}
+                  {assessments.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.title} ({a.type.toUpperCase()}) — Max: {a.maxMarks} pts (Weight: {a.weightage}%)
+                    </option>
+                  ))}
+                </Select>
+                {selectedAssessment && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteAssessment(selectedAssessment)}
+                    className="h-9 px-2.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors shrink-0 cursor-pointer"
+                    title="Delete selected assessment"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 )}
-                {assessments.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.title} ({a.type.toUpperCase()}) — Max: {a.maxMarks} pts (Weight: {a.weightage}%)
-                  </option>
-                ))}
-              </Select>
+              </div>
             </div>
 
             <div className="relative">
@@ -971,10 +1027,13 @@ export const TeacherMarksPage: React.FC = () => {
           </div>
 
           {totalAllocatedWeight + Number(newAsmtWeight || 0) > 100 && (
-            <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
-              Note: Adding <strong>{newAsmtWeight}%</strong> brings course total weightage to{' '}
-              <strong>{totalAllocatedWeight + Number(newAsmtWeight || 0)}%</strong> (exceeding 100%). Remaining capacity:{' '}
-              <strong>{remainingWeight}%</strong>.
+            <div className="p-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 flex items-start gap-2">
+              <AlertCircle size={15} className="shrink-0 mt-0.5 text-red-600" />
+              <span>
+                Weightage limit exceeded: Adding <strong>{newAsmtWeight}%</strong> would bring the course total to{' '}
+                <strong>{totalAllocatedWeight + Number(newAsmtWeight || 0)}%</strong> (maximum allowed is 100%). Remaining capacity:{' '}
+                <strong>{remainingWeight}%</strong>.
+              </span>
             </div>
           )}
 
@@ -986,7 +1045,10 @@ export const TeacherMarksPage: React.FC = () => {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isCreatingAsmt}>
+            <Button
+              type="submit"
+              disabled={isCreatingAsmt || totalAllocatedWeight + Number(newAsmtWeight || 0) > 100}
+            >
               {isCreatingAsmt ? 'Creating...' : 'Create Assessment'}
             </Button>
           </div>

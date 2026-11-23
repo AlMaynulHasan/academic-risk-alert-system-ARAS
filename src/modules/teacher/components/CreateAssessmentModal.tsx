@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '../../../shared/ui/Modal';
 import { Button } from '../../../shared/ui/Button';
 import { FormField } from '../../../shared/ui/FormField';
@@ -54,6 +54,26 @@ export const CreateAssessmentModal: React.FC<CreateAssessmentModalProps> = ({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [otherAllocatedWeight, setOtherAllocatedWeight] = useState<number>(0);
+
+  useEffect(() => {
+    if (!isOpen || !courseId) return;
+    academicRecordService
+      .getAssessments(courseId)
+      .then((list) => {
+        const sum = list
+          .filter(
+            (a) =>
+              a.id !== existingAssessment?.id &&
+              (!semesterId || !a.semesterId || a.semesterId === semesterId)
+          )
+          .reduce((acc, a) => acc + (a.weightage || 0), 0);
+        setOtherAllocatedWeight(sum);
+      })
+      .catch(() => setOtherAllocatedWeight(0));
+  }, [isOpen, courseId, semesterId, existingAssessment?.id]);
+
+  const remainingCapacity = Math.max(0, 100 - otherAllocatedWeight);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,6 +101,12 @@ export const CreateAssessmentModal: React.FC<CreateAssessmentModalProps> = ({
     const parsedWeightage = Number(weightage);
     if (isNaN(parsedWeightage) || parsedWeightage < 0 || parsedWeightage > 100) {
       setError('Weightage must be a number between 0% and 100%.');
+      return;
+    }
+    if (otherAllocatedWeight + parsedWeightage > 100) {
+      setError(
+        `Total course weightage cannot exceed 100% (other assessments use ${otherAllocatedWeight}%, remaining capacity ${remainingCapacity}%).`
+      );
       return;
     }
 
@@ -215,11 +241,15 @@ export const CreateAssessmentModal: React.FC<CreateAssessmentModalProps> = ({
             </div>
           </FormField>
 
-          <FormField label="Weightage (%)" required hint="0% to 100%">
+          <FormField
+            label="Weightage (%)"
+            required
+            hint={`Remaining capacity: ${remainingCapacity}% of 100%`}
+          >
             <Input
               type="number"
               min="0"
-              max="100"
+              max={remainingCapacity}
               step="1"
               value={weightage}
               onChange={(e) => setWeightage(e.target.value)}

@@ -56,8 +56,8 @@ export const CreateInvitationModal: React.FC<CreateInvitationModalProps> = ({
   const [phone, setPhone] = useState('');
   const [advisorId, setAdvisorId] = useState('');
 
-  // Immediate Activation & Password
-  const [instantActivate, setInstantActivate] = useState(true);
+  // Optional Immediate Activation & Password (off by default so activation token is issued)
+  const [instantActivate, setInstantActivate] = useState(false);
   const [password, setPassword] = useState('StudentPass2026!');
   const [showPassword, setShowPassword] = useState(false);
 
@@ -90,6 +90,7 @@ export const CreateInvitationModal: React.FC<CreateInvitationModalProps> = ({
     setPhone('');
     setAdvisorId('');
     setPassword('StudentPass2026!');
+    setInstantActivate(false);
     setCreatedInvitation(null);
     setWasInstantActivated(false);
     setSavedPassword('');
@@ -202,7 +203,7 @@ export const CreateInvitationModal: React.FC<CreateInvitationModalProps> = ({
 
         setWasInstantActivated(true);
         setSavedPassword(password);
-        showToast(`Student "${displayName}" registered, activated, and enrolled in courses!`, 'success');
+        showToast(`Student "${displayName}" registered and activated! Enroll courses via + Course or Enrollments.`, 'success');
       } else {
         setWasInstantActivated(false);
         showToast('Student registered successfully! Activation code generated.', 'success');
@@ -280,11 +281,11 @@ INSTRUCTIONS:
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={createdInvitation ? (wasInstantActivated ? 'Student Enrolled & Activated Successfully' : 'Student Registered & Code Issued') : 'Register New Student (Institutional Form)'}
+      title={createdInvitation ? (wasInstantActivated ? 'Student Registered & Activated Successfully' : 'Student Registered & Code Issued') : 'Register New Student (Institutional Form)'}
       description={
         createdInvitation
-          ? 'The student has been officially registered in the university system and courses have been linked.'
-          : 'Complete the institutional student enrollment form with auto-course enrollment and optional instant activation.'
+          ? 'The student has been officially registered in the university system. Use Enrollments or + Course to assign semester courses.'
+          : 'Complete the institutional student registration form with department details and optional instant activation.'
       }
       maxWidth="lg"
     >
@@ -394,7 +395,7 @@ INSTRUCTIONS:
               <ShieldCheck size={15} className="shrink-0 mt-0.5" />
               <span>
                 {wasInstantActivated
-                  ? 'Courses for the current semester have been automatically enrolled. The student can log in directly at the Student Portal!'
+                  ? 'The student account is active! Assign their specific department courses via the Enrollments tab or + Course button.'
                   : 'Provide this activation code to the student. They will visit the Student Activation page, verify their ID, and set their password to complete registration.'}
               </span>
             </div>
@@ -563,7 +564,7 @@ INSTRUCTIONS:
               />
               <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                 <Sparkles size={14} className="text-[#00a651]" />
-                <span>Activate Immediately with Initial Password (Recommended)</span>
+                <span>Optional: Activate Immediately with Initial Password (Skip Token Onboarding)</span>
               </span>
             </label>
 
@@ -602,7 +603,7 @@ INSTRUCTIONS:
                   </button>
                 </div>
                 <p className="text-[10px] text-slate-500">
-                  Direct activation creates the student account immediately and auto-enrolls them in their department's term courses.
+                  Direct activation creates the student account immediately so you can assign their department courses via Enrollments.
                 </p>
               </div>
             )}
